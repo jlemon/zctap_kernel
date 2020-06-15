@@ -151,6 +151,10 @@ extern void __remove_pages(unsigned long start_pfn, unsigned long nr_pages,
 extern int __add_pages(int nid, unsigned long start_pfn, unsigned long nr_pages,
 		       struct mhp_params *params);
 
+struct resource *add_memory_pages(int nid, u64 start, u64 size,
+                                  struct mhp_params *params);
+void release_memory_pages(struct resource *res);
+
 #ifndef CONFIG_ARCH_HAS_ADD_PAGES
 static inline int add_pages(int nid, unsigned long start_pfn,
 		unsigned long nr_pages, struct mhp_params *params)

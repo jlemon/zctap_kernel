@@ -138,8 +138,8 @@ static struct resource *register_memory_resource(u64 start, u64 size,
 			       resource_name, flags);
 
 	if (!res) {
-		pr_debug("Unable to reserve System RAM region: %016llx->%016llx\n",
-				start, start + size);
+		pr_debug("Unable to reserve %s region: %016llx->%016llx\n",
+				resource_name, start, start + size);
 		return ERR_PTR(-EEXIST);
 	}
 	return res;
@@ -1310,6 +1310,67 @@ int add_memory(int nid, u64 start, u64 size, mhp_t mhp_flags)
 	return rc;
 }
 EXPORT_SYMBOL_GPL(add_memory);
+
+static int __ref add_memory_section(int nid, struct resource *res,
+				    struct mhp_params *params)
+{
+	u64 start, end, section_size;
+	int ret;
+
+	/* must align start/end with memory block size */
+	end = res->start + resource_size(res);
+	section_size = memory_block_size_bytes();
+	start = round_down(res->start, section_size);
+	end = round_up(end, section_size);
+
+	mem_hotplug_begin();
+	ret = __add_pages(nid,
+		PHYS_PFN(start), PHYS_PFN(end - start), params);
+	mem_hotplug_done();
+
+	return ret;
+}
+
+/* requires device_hotplug_lock, see add_memory_resource() */
+static struct resource * __ref __add_memory_pages(int nid, u64 start, u64 size,
+				    struct mhp_params *params)
+{
+	struct resource *res;
+	int ret;
+
+	res = register_memory_resource(start, size, "Private RAM");
+	if (IS_ERR(res))
+		return res;
+
+	ret = add_memory_section(nid, res, params);
+	if (ret < 0 && ret != -EEXIST) {
+		release_memory_resource(res);
+		return ERR_PTR(ret);
+	}
+
+	return res;
+}
+
+struct resource *add_memory_pages(int nid, u64 start, u64 size,
+				  struct mhp_params *params)
+{
+	struct resource *res;
+
+	lock_device_hotplug();
+	res = __add_memory_pages(nid, start, size, params);
+	unlock_device_hotplug();
+
+	return res;
+}
+EXPORT_SYMBOL_GPL(add_memory_pages);
+
+void release_memory_pages(struct resource *res)
+{
+	lock_device_hotplug();
+	release_memory_resource(res);
+	unlock_device_hotplug();
+}
+EXPORT_SYMBOL_GPL(release_memory_pages);
 
 /*
  * Add special, driver-managed memory to the system as system RAM. Such
