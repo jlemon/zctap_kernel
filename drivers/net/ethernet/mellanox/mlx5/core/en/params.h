@@ -77,6 +77,14 @@ static inline void mlx5e_qid_get_ch_and_group(struct mlx5e_params *params,
 	*group = qid / nch;
 }
 
+static inline void mlx5e_get_qid_for_ch_in_group(struct mlx5e_params *params,
+						 u16 *qid,
+						 u16 ix,
+						 enum mlx5e_rq_group group)
+{
+	*qid = params->num_channels * group + ix;
+}
+
 static inline bool mlx5e_qid_validate(const struct mlx5e_profile *profile,
 				      struct mlx5e_params *params, u64 qid)
 {
