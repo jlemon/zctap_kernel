@@ -52,6 +52,7 @@
 #include "en/xsk/rx.h"
 #include "en/health.h"
 #include "en/params.h"
+#include "en/zctap/setup.h"
 
 static struct sk_buff *
 mlx5e_skb_from_cqe_mpwrq_linear(struct mlx5e_rq *rq, struct mlx5e_mpw_info *wi,
@@ -291,8 +292,11 @@ static inline int mlx5e_page_alloc(struct mlx5e_rq *rq,
 {
 	if (rq->xsk_pool)
 		return mlx5e_xsk_page_alloc_pool(rq, dma_info);
-	else
-		return mlx5e_page_alloc_pool(rq, dma_info);
+
+	if (dma_info->zctap_frag)
+		return mlx5e_zctap_get_page(rq, dma_info);
+
+	return mlx5e_page_alloc_pool(rq, dma_info);
 }
 
 void mlx5e_page_dma_unmap(struct mlx5e_rq *rq, struct mlx5e_dma_info *dma_info)
@@ -304,6 +308,9 @@ void mlx5e_page_release_dynamic(struct mlx5e_rq *rq,
 				struct mlx5e_dma_info *dma_info,
 				bool recycle)
 {
+	if (dma_info->zctap_frag)
+		return mlx5e_zctap_put_page(rq, dma_info, recycle);
+
 	if (likely(recycle)) {
 		if (mlx5e_rx_cache_put(rq, dma_info))
 			return;
@@ -419,6 +426,9 @@ static int mlx5e_alloc_rx_wqes(struct mlx5e_rq *rq, u16 ix, u8 wqe_bulk)
 			return -ENOMEM;
 	}
 
+	if (rq->zctap_ifq && !mlx5e_zctap_avail(rq, wqe_bulk))
+		return -ENOMEM;
+
 	for (i = 0; i < wqe_bulk; i++) {
 		struct mlx5e_rx_wqe_cyc *wqe = mlx5_wq_cyc_get_wqe(wq, ix + i);
 
@@ -427,11 +437,17 @@ static int mlx5e_alloc_rx_wqes(struct mlx5e_rq *rq, u16 ix, u8 wqe_bulk)
 			goto free_wqes;
 	}
 
+	if (rq->zctap_ifq)
+		mlx5e_zctap_taken(rq);
+
 	return 0;
 
 free_wqes:
 	while (--i >= 0)
 		mlx5e_dealloc_rx_wqe(rq, ix + i);
+
+	if (rq->zctap_ifq)
+		mlx5e_zctap_taken(rq);
 
 	return err;
 }
@@ -441,12 +457,22 @@ mlx5e_add_skb_frag(struct mlx5e_rq *rq, struct sk_buff *skb,
 		   struct mlx5e_dma_info *di, u32 frag_offset, u32 len,
 		   unsigned int truesize)
 {
-	dma_sync_single_for_cpu(rq->pdev,
-				di->addr + frag_offset,
-				len, DMA_FROM_DEVICE);
-	page_ref_inc(di->page);
+	struct page *page = di->page;
+
+	if (mlx5e_zctap_page(page)) {
+		page = mlx5e_zctap_rx_data(rq, di, frag_offset, len);
+		/* uarg is attached here, as RST/ACK packets don't need it */
+		mlx5e_zcopy_set(skb, rq);
+	} else {
+		page_ref_inc(di->page);
+		dma_sync_single_for_cpu(rq->pdev,
+					di->addr + frag_offset,
+					len, DMA_FROM_DEVICE);
+	}
+
 	skb_add_rx_frag(skb, skb_shinfo(skb)->nr_frags,
-			di->page, frag_offset, len, truesize);
+			page, frag_offset, len, truesize);
+
 }
 
 static inline void

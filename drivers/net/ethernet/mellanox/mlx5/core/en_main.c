@@ -61,6 +61,7 @@
 #include "en/xsk/setup.h"
 #include "en/xsk/rx.h"
 #include "en/xsk/tx.h"
+#include "en/zctap/setup.h"
 #include "en/hv_vhca_stats.h"
 #include "en/devlink.h"
 #include "lib/mlx5.h"
@@ -1977,6 +1978,24 @@ mlx5e_xsk_optional_open(struct mlx5e_priv *priv, int ix,
 	return err;
 }
 
+static int
+mlx5e_zctap_optional_open(struct mlx5e_priv *priv, int ix,
+			  struct mlx5e_params *params,
+			  struct mlx5e_channel_param *cparam,
+			  struct mlx5e_channel *c)
+{
+	struct zctap_ifq *ifq;
+	int err = 0;
+
+	ifq = mlx5e_zctap_get_ifq(params, params->xsk, ix);
+
+	if (ifq)
+		err = mlx5e_open_zctap(priv, params, ifq, c);
+
+	return err;
+}
+
+
 static int mlx5e_open_channel(struct mlx5e_priv *priv, int ix,
 			      struct mlx5e_params *params,
 			      struct mlx5e_channel_param *cparam,
@@ -2024,6 +2043,11 @@ static int mlx5e_open_channel(struct mlx5e_priv *priv, int ix,
 			goto err_close_queues;
 	}
 
+	/* This opens a second set of shadow queues for zctap */
+	err = mlx5e_zctap_optional_open(priv, ix, params, cparam, c);
+	if (unlikely(err))
+		goto err_close_queues;
+
 	*cp = c;
 
 	return 0;
@@ -2060,6 +2084,9 @@ static void mlx5e_deactivate_channel(struct mlx5e_channel *c)
 	if (test_bit(MLX5E_CHANNEL_STATE_XSK, c->state))
 		mlx5e_deactivate_xsk(c);
 
+	if (test_bit(MLX5E_CHANNEL_STATE_ZCTAP, c->state))
+		mlx5e_deactivate_zctap(c);
+
 	mlx5e_deactivate_rq(&c->rq);
 	mlx5e_deactivate_icosq(&c->async_icosq);
 	mlx5e_deactivate_icosq(&c->icosq);
@@ -2071,6 +2098,10 @@ static void mlx5e_close_channel(struct mlx5e_channel *c)
 {
 	if (test_bit(MLX5E_CHANNEL_STATE_XSK, c->state))
 		mlx5e_close_xsk(c);
+
+	if (test_bit(MLX5E_CHANNEL_STATE_ZCTAP, c->state))
+		mlx5e_close_zctap(c);
+
 	mlx5e_close_queues(c);
 	netif_napi_del(&c->napi);
 
@@ -3090,11 +3121,13 @@ void mlx5e_activate_priv_channels(struct mlx5e_priv *priv)
 	mlx5e_redirect_rqts_to_channels(priv, &priv->channels);
 
 	mlx5e_xsk_redirect_rqts_to_channels(priv, &priv->channels);
+	mlx5e_zctap_redirect_rqts_to_channels(priv, &priv->channels);
 }
 
 void mlx5e_deactivate_priv_channels(struct mlx5e_priv *priv)
 {
 	mlx5e_xsk_redirect_rqts_to_drop(priv, &priv->channels);
+	mlx5e_zctap_redirect_rqts_to_drop(priv, &priv->channels);
 
 	mlx5e_redirect_rqts_to_drop(priv);
 
@@ -4581,6 +4614,9 @@ static int mlx5e_xdp(struct net_device *dev, struct netdev_bpf *xdp)
 	case XDP_SETUP_XSK_POOL:
 		return mlx5e_xsk_setup_pool(dev, xdp->xsk.pool,
 					    xdp->xsk.queue_id);
+	case XDP_SETUP_ZCTAP:
+		return mlx5e_zctap_setup_ifq(dev, xdp->zct.ifq,
+					     &xdp->zct.queue_id);
 	default:
 		return -EINVAL;
 	}

@@ -41,6 +41,7 @@
 #include "en_accel/en_accel.h"
 #include "lib/clock.h"
 #include "en/ptp.h"
+#include "en/zctap/setup.h"
 
 static void mlx5e_dma_unmap_wqe_err(struct mlx5e_txqsq *sq, u8 num_dma)
 {
@@ -292,6 +293,24 @@ mlx5e_txwqe_build_dsegs(struct mlx5e_txqsq *sq, struct sk_buff *skb,
 		mlx5e_dma_push(sq, dma_addr, headlen, MLX5E_DMA_MAP_SINGLE);
 		num_dma++;
 		dseg++;
+	}
+
+	if (skb_dma_lookup(skb)) {
+		for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+			skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
+			int fsz = skb_frag_size(frag);
+
+			dma_addr = mlx5e_zctap_get_frag_dma(skb, frag);
+
+			dseg->addr       = cpu_to_be64(dma_addr);
+			dseg->lkey       = sq->mkey_be;
+			dseg->byte_count = cpu_to_be32(fsz);
+
+			mlx5e_dma_push(sq, dma_addr, fsz, MLX5E_DMA_MAP_FIXED);
+			num_dma++;
+			dseg++;
+		}
+		return num_dma;
 	}
 
 	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
