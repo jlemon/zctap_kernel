@@ -15,6 +15,9 @@ static inline struct xsk_buff_pool *mlx5e_xsk_get_pool(struct mlx5e_params *para
 	if (unlikely(ix >= params->num_channels))
 		return NULL;
 
+	if (unlikely(!xsk->is_pool))
+		return NULL;
+
 	return xsk->pools[ix];
 }
 

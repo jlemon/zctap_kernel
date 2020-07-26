@@ -581,6 +581,7 @@ struct mlx5e_rq_frags_info {
 	u8 wqe_bulk;
 };
 
+struct zctap_ifq;
 struct mlx5e_rq {
 	/* data path */
 	union {
@@ -638,8 +639,9 @@ struct mlx5e_rq {
 	DECLARE_BITMAP(flags, 8);
 	struct page_pool      *page_pool;
 
-	/* AF_XDP zero-copy */
+	/* AF_XDP or ZCTAP zero-copy */
 	struct xsk_buff_pool  *xsk_pool;
+	struct zctap_ifq      *zctap_ifq;
 
 	struct work_struct     recover_work;
 
@@ -658,6 +660,7 @@ struct mlx5e_rq {
 
 enum mlx5e_channel_state {
 	MLX5E_CHANNEL_STATE_XSK,
+	MLX5E_CHANNEL_STATE_ZCTAP,
 	MLX5E_CHANNEL_NUM_STATES
 };
 
@@ -778,9 +781,13 @@ struct mlx5e_xsk {
 	 * distinguish between zero-copy and non-zero-copy UMEMs, so
 	 * rely on our mechanism.
 	 */
-	struct xsk_buff_pool **pools;
+	union {
+		struct xsk_buff_pool **pools;
+		struct zctap_ifq **ifq_tbl;
+	};
 	u16 refcnt;
 	bool ever_used;
+	bool is_pool;
 };
 
 /* Temporary storage for variables that are allocated when struct mlx5e_priv is

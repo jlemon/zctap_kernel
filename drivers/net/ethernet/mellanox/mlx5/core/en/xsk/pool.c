@@ -27,7 +27,10 @@ static int mlx5e_xsk_get_pools(struct mlx5e_xsk *xsk)
 				     sizeof(*xsk->pools), GFP_KERNEL);
 		if (unlikely(!xsk->pools))
 			return -ENOMEM;
+		xsk->is_pool = true;
 	}
+	if (!xsk->is_pool)
+		return -EINVAL;
 
 	xsk->refcnt++;
 	xsk->ever_used = true;
