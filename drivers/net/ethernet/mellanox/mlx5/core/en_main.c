@@ -402,6 +402,7 @@ static int mlx5e_alloc_rq(struct mlx5e_channel *c,
 	struct mlx5_core_dev *mdev = c->mdev;
 	void *rqc = rqp->rqc;
 	void *rqc_wq = MLX5_ADDR_OF(rqc, rqc, wq);
+	bool hd_split = !xsk_pool && xsk && xsk->hd_split;
 	u32 rq_xdp_ix;
 	u32 pool_size;
 	int wq_sz;
@@ -410,7 +411,7 @@ static int mlx5e_alloc_rq(struct mlx5e_channel *c,
 
 	rqp->wq.db_numa_node = cpu_to_node(c->cpu);
 
-	rq->wq_type = params->rq_wq_type;
+	rq->wq_type = hd_split ? MLX5_WQ_TYPE_CYCLIC : params->rq_wq_type;
 	rq->pdev    = c->pdev;
 	rq->netdev  = c->netdev;
 	rq->priv    = c->priv;
@@ -506,7 +507,7 @@ static int mlx5e_alloc_rq(struct mlx5e_channel *c,
 		rq->mkey_be = c->mkey_be;
 	}
 
-	err = mlx5e_rq_set_handlers(rq, params, xsk);
+	err = mlx5e_rq_set_handlers(rq, params, rq->xsk_pool, hd_split);
 	if (err)
 		goto err_free_by_rq_type;
 
@@ -2082,16 +2083,20 @@ static void mlx5e_build_rq_frags_info(struct mlx5_core_dev *mdev,
 				      struct mlx5e_rq_frags_info *info)
 {
 	u32 byte_count = MLX5E_SW2HW_MTU(params, params->sw_mtu);
-	int frag_size_max = DEFAULT_FRAG_SIZE;
+	u8 hd_split = xsk ? xsk->hd_split : 0;
+	int frag_size_max;
 	u32 buf_size = 0;
 	int i;
+
+	frag_size_max = hd_split ? HD_SPLIT_DEFAULT_FRAG_SIZE :
+			DEFAULT_FRAG_SIZE;
 
 #ifdef CONFIG_MLX5_EN_IPSEC
 	if (MLX5_IPSEC_DEV(mdev))
 		byte_count += MLX5E_METADATA_ETHER_LEN;
 #endif
 
-	if (mlx5e_rx_is_linear_skb(params, xsk)) {
+	if (!hd_split && mlx5e_rx_is_linear_skb(params, xsk)) {
 		int frag_stride;
 
 		frag_stride = mlx5e_rx_get_linear_frag_sz(params, xsk);
@@ -2109,15 +2114,27 @@ static void mlx5e_build_rq_frags_info(struct mlx5_core_dev *mdev,
 		frag_size_max = PAGE_SIZE;
 
 	i = 0;
+
+	if (hd_split) {
+		// Start with one fragment for all headers (implementing HDS)
+		info->arr[0].frag_size = hd_split;
+		info->arr[0].frag_stride = roundup_pow_of_two(PAGE_SIZE);
+		buf_size += hd_split;
+		// Now, continue with the payload frags.
+		i = 1;
+	}
+
 	while (buf_size < byte_count) {
 		int frag_size = byte_count - buf_size;
+		int frag_stride;
 
 		if (i < MLX5E_MAX_RX_FRAGS - 1)
 			frag_size = min(frag_size, frag_size_max);
 
+		frag_stride = hd_split ? PAGE_SIZE : frag_size;
 		info->arr[i].frag_size = frag_size;
-		info->arr[i].frag_stride = roundup_pow_of_two(frag_size);
-
+		info->arr[i].frag_stride = roundup_pow_of_two(frag_stride);
+		info->arr[i].frag_source = !!hd_split;
 		buf_size += frag_size;
 		i++;
 	}
@@ -2160,9 +2177,11 @@ void mlx5e_build_rq_param(struct mlx5e_priv *priv,
 	struct mlx5_core_dev *mdev = priv->mdev;
 	void *rqc = param->rqc;
 	void *wq = MLX5_ADDR_OF(rqc, rqc, wq);
+	bool hd_split = xsk && xsk->hd_split;
+	u8 wq_type = hd_split ? MLX5_WQ_TYPE_CYCLIC : params->rq_wq_type;
 	int ndsegs = 1;
 
-	switch (params->rq_wq_type) {
+	switch (wq_type) {
 	case MLX5_WQ_TYPE_LINKED_LIST_STRIDING_RQ:
 		MLX5_SET(wq, wq, log_wqe_num_of_strides,
 			 mlx5e_mpwqe_get_log_num_strides(mdev, params, xsk) -
@@ -2178,10 +2197,10 @@ void mlx5e_build_rq_param(struct mlx5e_priv *priv,
 		ndsegs = param->frags_info.num_frags;
 	}
 
-	MLX5_SET(wq, wq, wq_type,          params->rq_wq_type);
+	MLX5_SET(wq, wq, wq_type,          wq_type);
 	MLX5_SET(wq, wq, end_padding_mode, MLX5_WQ_END_PAD_MODE_ALIGN);
 	MLX5_SET(wq, wq, log_wq_stride,
-		 mlx5e_get_rqwq_log_stride(params->rq_wq_type, ndsegs));
+		 mlx5e_get_rqwq_log_stride(wq_type, ndsegs));
 	MLX5_SET(wq, wq, pd,               mdev->mlx5e_res.pdn);
 	MLX5_SET(rqc, rqc, counter_set_id, priv->q_counter);
 	MLX5_SET(rqc, rqc, vsd,            params->vlan_strip_disable);
@@ -2254,9 +2273,11 @@ void mlx5e_build_rx_cq_param(struct mlx5e_priv *priv,
 	struct mlx5_core_dev *mdev = priv->mdev;
 	bool hw_stridx = false;
 	void *cqc = param->cqc;
+	bool hd_split = xsk && xsk->hd_split;
+	u8 wq_type = hd_split ? MLX5_WQ_TYPE_CYCLIC : params->rq_wq_type;
 	u8 log_cq_size;
 
-	switch (params->rq_wq_type) {
+	switch (wq_type) {
 	case MLX5_WQ_TYPE_LINKED_LIST_STRIDING_RQ:
 		log_cq_size = mlx5e_mpwqe_get_log_rq_size(params, xsk) +
 			mlx5e_mpwqe_get_log_num_strides(mdev, params, xsk);

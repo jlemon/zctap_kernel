@@ -59,6 +59,7 @@
 
 extern const struct net_device_ops mlx5e_netdev_ops;
 struct page_pool;
+#define HD_SPLIT_DEFAULT_FRAG_SIZE (4096)
 
 #define MLX5E_METADATA_ETHER_TYPE (0x8CE4)
 #define MLX5E_METADATA_ETHER_LEN 8
@@ -559,7 +560,8 @@ typedef struct sk_buff *
 typedef bool (*mlx5e_fp_post_rx_wqes)(struct mlx5e_rq *rq);
 typedef void (*mlx5e_fp_dealloc_wqe)(struct mlx5e_rq*, u16);
 
-int mlx5e_rq_set_handlers(struct mlx5e_rq *rq, struct mlx5e_params *params, bool xsk);
+int mlx5e_rq_set_handlers(struct mlx5e_rq *rq, struct mlx5e_params *params,
+			  bool xsk, u8 hd_split);
 
 enum mlx5e_rq_flag {
 	MLX5E_RQ_FLAG_XDP_XMIT,
@@ -569,6 +571,7 @@ enum mlx5e_rq_flag {
 struct mlx5e_rq_frag_info {
 	int frag_size;
 	int frag_stride;
+	int frag_source;
 };
 
 struct mlx5e_rq_frags_info {

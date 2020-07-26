@@ -148,7 +148,8 @@ u16 mlx5e_get_rq_headroom(struct mlx5_core_dev *mdev,
 			  struct mlx5e_params *params,
 			  struct mlx5e_xsk_param *xsk)
 {
-	bool is_linear_skb = (params->rq_wq_type == MLX5_WQ_TYPE_CYCLIC) ?
+	bool is_linear_skb = (xsk && xsk->hd_split) ? false :
+		(params->rq_wq_type == MLX5_WQ_TYPE_CYCLIC) ?
 		mlx5e_rx_is_linear_skb(params, xsk) :
 		mlx5e_rx_mpwqe_is_linear_skb(mdev, params, xsk);
 

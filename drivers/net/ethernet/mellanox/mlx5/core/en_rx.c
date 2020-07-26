@@ -1769,7 +1769,8 @@ wq_free_wqe:
 
 #endif /* CONFIG_MLX5_EN_IPSEC */
 
-int mlx5e_rq_set_handlers(struct mlx5e_rq *rq, struct mlx5e_params *params, bool xsk)
+int mlx5e_rq_set_handlers(struct mlx5e_rq *rq, struct mlx5e_params *params,
+                          bool xsk, u8 hd_split)
 {
 	struct net_device *netdev = rq->netdev;
 	struct mlx5_core_dev *mdev = rq->mdev;
@@ -1798,8 +1799,9 @@ int mlx5e_rq_set_handlers(struct mlx5e_rq *rq, struct mlx5e_params *params, bool
 		}
 		break;
 	default: /* MLX5_WQ_TYPE_CYCLIC */
-		rq->wqe.skb_from_cqe = xsk ?
-			mlx5e_xsk_skb_from_cqe_linear :
+		rq->wqe.skb_from_cqe =
+			hd_split ? mlx5e_skb_from_cqe_nonlinear :
+			xsk ? mlx5e_xsk_skb_from_cqe_linear :
 			mlx5e_rx_is_linear_skb(params, NULL) ?
 				mlx5e_skb_from_cqe_linear :
 				mlx5e_skb_from_cqe_nonlinear;
