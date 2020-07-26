@@ -1954,15 +1954,33 @@ static u8 mlx5e_enumerate_lag_port(struct mlx5_core_dev *mdev, int ix)
 	return (ix + port_aff_bias) % mlx5e_get_num_lag_ports(mdev);
 }
 
+static int
+mlx5e_xsk_optional_open(struct mlx5e_priv *priv, int ix,
+			struct mlx5e_params *params,
+			struct mlx5e_channel_param *cparam,
+			struct mlx5e_channel *c)
+{
+	struct mlx5e_xsk_param xsk;
+	struct xsk_buff_pool *xsk_pool;
+	int err = 0;
+
+	xsk_pool = mlx5e_xsk_get_pool(params, params->xsk, ix);
+
+	if (xsk_pool) {
+		mlx5e_build_xsk_param(xsk_pool, &xsk);
+		err = mlx5e_open_xsk(priv, params, &xsk, xsk_pool, c);
+	}
+
+	return err;
+}
+
 static int mlx5e_open_channel(struct mlx5e_priv *priv, int ix,
 			      struct mlx5e_params *params,
 			      struct mlx5e_channel_param *cparam,
-			      struct xsk_buff_pool *xsk_pool,
 			      struct mlx5e_channel **cp)
 {
 	int cpu = cpumask_first(mlx5_comp_irq_get_affinity_mask(priv->mdev, ix));
 	struct net_device *netdev = priv->netdev;
-	struct mlx5e_xsk_param xsk;
 	struct mlx5e_channel *c;
 	unsigned int irq;
 	int err;
@@ -1996,9 +2014,9 @@ static int mlx5e_open_channel(struct mlx5e_priv *priv, int ix,
 	if (unlikely(err))
 		goto err_napi_del;
 
-	if (xsk_pool) {
-		mlx5e_build_xsk_param(xsk_pool, &xsk);
-		err = mlx5e_open_xsk(priv, params, &xsk, xsk_pool, c);
+	/* This opens a second set of shadow queues for xsk */
+	if (params->xdp_prog) {
+		err = mlx5e_xsk_optional_open(priv, ix, params, cparam, c);
 		if (unlikely(err))
 			goto err_close_queues;
 	}
@@ -2364,12 +2382,7 @@ int mlx5e_open_channels(struct mlx5e_priv *priv,
 
 	mlx5e_build_channel_param(priv, &chs->params, cparam);
 	for (i = 0; i < chs->num; i++) {
-		struct xsk_buff_pool *xsk_pool = NULL;
-
-		if (chs->params.xdp_prog)
-			xsk_pool = mlx5e_xsk_get_pool(&chs->params, chs->params.xsk, i);
-
-		err = mlx5e_open_channel(priv, i, &chs->params, cparam, xsk_pool, &chs->c[i]);
+		err = mlx5e_open_channel(priv, i, &chs->params, cparam, &chs->c[i]);
 		if (err)
 			goto err_close_channels;
 	}
