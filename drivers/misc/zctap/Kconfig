@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Zero Copy Transfer
+#
+config ZCTAP
+	tristate "Zerocopy transfer"
+	depends on PCI
+	imply ZCTAP_STUB
+	help
+	  Experimental zerocopy transfer
+
+config ZCTAP_STUB
+	bool
+	depends on ZCTAP = m
