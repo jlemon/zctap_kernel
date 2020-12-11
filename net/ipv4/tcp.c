@@ -1010,7 +1010,7 @@ new_segment:
 	}
 
 	if (!(flags & MSG_NO_SHARED_FRAGS))
-		skb_shinfo(skb)->tx_flags |= SKBTX_SHARED_FRAG;
+		skb_shinfo(skb)->zc_flags |= SKBZC_SHARED_FRAG;
 
 	skb->len += copy;
 	skb->data_len += copy;
