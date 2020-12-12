@@ -482,10 +482,13 @@ struct ubuf_info {
 	refcount_t refcnt;
 	u8 zc_flags;
 
-	struct mmpin {
-		struct user_struct *user;
-		unsigned int num_pg;
-	} mmp;
+	union {
+		struct mmpin {
+			struct user_struct *user;
+			unsigned int num_pg;
+		} mmp;
+		struct list_head info_node;
+	};
 };
 
 #define skb_uarg(SKB)	((struct ubuf_info *)(skb_shinfo(SKB)->destructor_arg))
