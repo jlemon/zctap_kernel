@@ -1315,6 +1315,8 @@ static int skb_zerocopy_clone(struct sk_buff *nskb, struct sk_buff *orig,
 			}
 			if (skb_uarg(nskb) == skb_uarg(orig))
 				return 0;
+			if (skb_fixed(nskb) || skb_fixed(orig))
+				return -EIO;
 			if (skb_copy_ubufs(nskb, GFP_ATOMIC))
 				return -EIO;
 		}
@@ -6140,7 +6142,7 @@ void skb_condense(struct sk_buff *skb)
 {
 	if (skb->data_len) {
 		if (skb->data_len > skb->end - skb->tail ||
-		    skb_cloned(skb))
+		    skb_cloned(skb) || skb_fixed(skb))
 			return;
 
 		/* Nice, we can free page frag(s) right now */

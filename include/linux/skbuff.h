@@ -452,6 +452,9 @@ enum {
 	 * all frags to avoid possible bad checksum
 	 */
 	SKBZC_SHARED_FRAG = BIT(1),
+
+	/* At least one fragment has a fixed location and may not be moved. */
+	SKBZC_FIXED = BIT(2),
 };
 
 #define SKBZC_FRAGMENTS		(SKBZC_ENABLE | SKBZC_SHARED_FRAG)
@@ -1437,6 +1440,11 @@ static inline unsigned int skb_end_offset(const struct sk_buff *skb)
 static inline struct skb_shared_hwtstamps *skb_hwtstamps(struct sk_buff *skb)
 {
 	return &skb_shinfo(skb)->hwtstamps;
+}
+
+static inline bool skb_fixed(const struct sk_buff *skb)
+{
+	return skb_shinfo(skb)->zc_flags & SKBZC_FIXED;
 }
 
 static inline struct ubuf_info *skb_zcopy(struct sk_buff *skb)
@@ -2786,7 +2794,7 @@ static inline void skb_orphan(struct sk_buff *skb)
  */
 static inline int skb_orphan_frags(struct sk_buff *skb, gfp_t gfp_mask)
 {
-	if (likely(!skb_zcopy(skb)))
+	if (likely(!skb_zcopy(skb)) || skb_fixed(skb))
 		return 0;
 	if (!skb_zcopy_is_nouarg(skb) &&
 	    skb_uarg(skb)->callback == msg_zerocopy_callback)
@@ -2797,7 +2805,7 @@ static inline int skb_orphan_frags(struct sk_buff *skb, gfp_t gfp_mask)
 /* Frags must be orphaned, even if refcounted, if skb might loop to rx path */
 static inline int skb_orphan_frags_rx(struct sk_buff *skb, gfp_t gfp_mask)
 {
-	if (likely(!skb_zcopy(skb)))
+	if (likely(!skb_zcopy(skb) || skb_fixed(skb)))
 		return 0;
 	return skb_copy_ubufs(skb, gfp_mask);
 }
