@@ -475,6 +475,13 @@ static void tcp_tx_timestamp(struct sock *sk, u16 tsflags)
 	}
 }
 
+static inline bool tcp_stream_rdband(const struct sock *sk)
+{
+	if (sk->sk_prot->stream_memory_rdband)
+		return sk->sk_prot->stream_memory_rdband(sk);
+	return false;
+}
+
 static inline bool tcp_stream_is_readable(const struct tcp_sock *tp,
 					  int target, struct sock *sk)
 {
@@ -564,6 +571,8 @@ __poll_t tcp_poll(struct file *file, struct socket *sock, poll_table *wait)
 
 		if (tcp_stream_is_readable(tp, target, sk))
 			mask |= EPOLLIN | EPOLLRDNORM;
+		if (tcp_stream_rdband(sk))
+			mask |= EPOLLRDBAND;
 
 		if (!(sk->sk_shutdown & SEND_SHUTDOWN)) {
 			if (__sk_stream_is_writeable(sk, 1)) {
