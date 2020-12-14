@@ -1119,6 +1119,7 @@ struct ubuf_info *msg_zerocopy_alloc(struct sock *sk, size_t size)
 	uarg->len = 1;
 	uarg->bytelen = size;
 	uarg->zerocopy = 1;
+	uarg->zc_flags = SKBZC_FRAGMENTS;
 	refcount_set(&uarg->refcnt, 1);
 	sock_hold(sk);
 
