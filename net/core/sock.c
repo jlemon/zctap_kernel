@@ -138,6 +138,7 @@
 
 #include <net/tcp.h>
 #include <net/busy_poll.h>
+#include <net/zctap.h>
 
 static DEFINE_MUTEX(proto_list_mutex);
 static LIST_HEAD(proto_list);
@@ -2390,6 +2391,8 @@ int __sock_cmsg_send(struct sock *sk, struct msghdr *msg, struct cmsghdr *cmsg,
 		sockc->tsflags &= ~SOF_TIMESTAMPING_TX_RECORD_MASK;
 		sockc->tsflags |= tsflags;
 		break;
+	case SO_NOTIFY:
+		return zctap_tx_add_notifier(sk, cmsg);
 	case SCM_TXTIME:
 		if (!sock_flag(sk, SOCK_TXTIME))
 			return -EINVAL;
