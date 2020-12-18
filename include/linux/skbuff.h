@@ -455,6 +455,9 @@ enum {
 
 	/* At least one fragment has a fixed location and may not be moved. */
 	SKBZC_FIXED = BIT(2),
+
+	/* Use the ubuf to lookup the dma address for fragments. */
+	SKBZC_DMA_LOOKUP = BIT(3),
 };
 
 #define SKBZC_FRAGMENTS		(SKBZC_ENABLE | SKBZC_SHARED_FRAG)
@@ -1445,6 +1448,11 @@ static inline struct skb_shared_hwtstamps *skb_hwtstamps(struct sk_buff *skb)
 static inline bool skb_fixed(const struct sk_buff *skb)
 {
 	return skb_shinfo(skb)->zc_flags & SKBZC_FIXED;
+}
+
+static inline bool skb_dma_lookup(const struct sk_buff *skb)
+{
+	return skb_shinfo(skb)->zc_flags & SKBZC_DMA_LOOKUP;
 }
 
 static inline struct ubuf_info *skb_zcopy(struct sk_buff *skb)
