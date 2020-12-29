@@ -304,7 +304,8 @@ struct mlx5e_cq_decomp {
 
 enum mlx5e_dma_map_type {
 	MLX5E_DMA_MAP_SINGLE,
-	MLX5E_DMA_MAP_PAGE
+	MLX5E_DMA_MAP_PAGE,
+	MLX5E_DMA_MAP_FIXED
 };
 
 struct mlx5e_sq_dma {

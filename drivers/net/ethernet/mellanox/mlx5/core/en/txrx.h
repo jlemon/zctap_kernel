@@ -282,6 +282,9 @@ mlx5e_tx_dma_unmap(struct device *pdev, struct mlx5e_sq_dma *dma)
 	case MLX5E_DMA_MAP_PAGE:
 		dma_unmap_page(pdev, dma->addr, dma->size, DMA_TO_DEVICE);
 		break;
+	case MLX5E_DMA_MAP_FIXED:
+		/* DMA mappings are fixed, or managed elsewhere. */
+		break;
 	default:
 		WARN_ONCE(true, "mlx5e_tx_dma_unmap unknown DMA type!\n");
 	}
