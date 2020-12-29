@@ -13,6 +13,8 @@
 #include <linux/scatterlist.h>
 #include <linux/instrumented.h>
 
+#include <net/zctap.h>
+
 #define PIPE_PARANOIA /* for now */
 
 #define iterate_iovec(i, n, __v, __p, skip, STEP) {	\
@@ -1353,6 +1355,54 @@ ssize_t iov_iter_get_pages(struct iov_iter *i,
 	return 0;
 }
 EXPORT_SYMBOL(iov_iter_get_pages);
+
+#if IS_ENABLED(CONFIG_ZCTAP)
+ssize_t iov_iter_udata_get_pages(struct iov_iter *i, struct page **pages,
+		size_t maxsize, unsigned maxpages, size_t *pgoff, void *udata)
+{
+	const struct iovec *iov;
+	unsigned long addr;
+	struct iovec v;
+	size_t len;
+	unsigned n;
+	int ret;
+
+	if (!udata)
+		return iov_iter_get_pages(i, pages, maxsize, maxpages, pgoff);
+
+	if (maxsize > i->count)
+		maxsize = i->count;
+
+	if (!iter_is_iovec(i))
+		return -EFAULT;
+
+	if (iov_iter_rw(i) != WRITE)
+		return -EFAULT;
+
+	iterate_iovec(i, maxsize, v, iov, i->iov_offset, ({
+		addr = (unsigned long)v.iov_base;
+		*pgoff = addr & (PAGE_SIZE - 1);
+		len = v.iov_len + *pgoff;
+
+		if (len > maxpages * PAGE_SIZE)
+			len = maxpages * PAGE_SIZE;
+
+		n = DIV_ROUND_UP(len, PAGE_SIZE);
+
+		ret = zctap_get_pages(udata, pages, addr, n);
+		if (ret > 0)
+			ret = (ret == n ? len : ret * PAGE_SIZE) - *pgoff;
+		return ret;
+	0;}));
+	return 0;
+}
+#else
+ssize_t iov_iter_udata_get_pages(struct iov_iter *i, struct page **pages,
+		size_t maxsize, unsigned maxpages, size_t *pgoff, void *udata)
+{
+	return iov_iter_get_pages(i, pages, maxsize, maxpages, pgoff);
+}
+#endif
 
 static struct page **get_pages_array(size_t n)
 {

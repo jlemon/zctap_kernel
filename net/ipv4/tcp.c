@@ -275,6 +275,7 @@
 #include <net/xfrm.h>
 #include <net/ip.h>
 #include <net/sock.h>
+#include <net/zctap.h>
 
 #include <linux/uaccess.h>
 #include <asm/ioctls.h>
@@ -1235,6 +1236,15 @@ int tcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t size)
 		zc = sk->sk_route_caps & NETIF_F_SG;
 		if (!zc)
 			uarg->zerocopy = 0;
+	}
+
+	if (flags & MSG_ZCTAP && size && sock_flag(sk, SOCK_ZEROCOPY)) {
+		zc = sk->sk_route_caps & NETIF_F_SG;
+		if (!zc) {
+			err = -EFAULT;
+			goto out_err;
+		}
+		uarg = zctap_get_notifier(sk);
 	}
 
 	if (unlikely(flags & MSG_FASTOPEN || inet_sk(sk)->defer_connect) &&
