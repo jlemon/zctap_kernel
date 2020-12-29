@@ -59,6 +59,7 @@
 
 extern const struct net_device_ops mlx5e_netdev_ops;
 struct page_pool;
+#define HD_SPLIT_DEFAULT_FRAG_SIZE (4096)
 
 #define MLX5E_METADATA_ETHER_TYPE (0x8CE4)
 #define MLX5E_METADATA_ETHER_LEN 8
@@ -303,7 +304,8 @@ struct mlx5e_cq_decomp {
 
 enum mlx5e_dma_map_type {
 	MLX5E_DMA_MAP_SINGLE,
-	MLX5E_DMA_MAP_PAGE
+	MLX5E_DMA_MAP_PAGE,
+	MLX5E_DMA_MAP_FIXED
 };
 
 struct mlx5e_sq_dma {
@@ -397,6 +399,7 @@ struct mlx5e_dma_info {
 		struct page *page;
 		struct xdp_buff *xsk;
 	};
+	bool zctap_frag;
 };
 
 /* XDP packets can be transmitted in different ways. On completion, we need to
@@ -559,7 +562,8 @@ typedef struct sk_buff *
 typedef bool (*mlx5e_fp_post_rx_wqes)(struct mlx5e_rq *rq);
 typedef void (*mlx5e_fp_dealloc_wqe)(struct mlx5e_rq*, u16);
 
-int mlx5e_rq_set_handlers(struct mlx5e_rq *rq, struct mlx5e_params *params, bool xsk);
+int mlx5e_rq_set_handlers(struct mlx5e_rq *rq, struct mlx5e_params *params,
+			  bool xsk, u8 hd_split);
 
 enum mlx5e_rq_flag {
 	MLX5E_RQ_FLAG_XDP_XMIT,
@@ -569,6 +573,7 @@ enum mlx5e_rq_flag {
 struct mlx5e_rq_frag_info {
 	int frag_size;
 	int frag_stride;
+	int frag_source;
 };
 
 struct mlx5e_rq_frags_info {
@@ -578,6 +583,7 @@ struct mlx5e_rq_frags_info {
 	u8 wqe_bulk;
 };
 
+struct zctap_ifq;
 struct mlx5e_rq {
 	/* data path */
 	union {
@@ -605,6 +611,7 @@ struct mlx5e_rq {
 		u16            headroom;
 		u32            frame0_sz;
 		u8             map_dir;   /* dma map direction */
+		u8	       frame0_split;
 	} buff;
 
 	struct device         *pdev;
@@ -634,8 +641,9 @@ struct mlx5e_rq {
 	DECLARE_BITMAP(flags, 8);
 	struct page_pool      *page_pool;
 
-	/* AF_XDP zero-copy */
+	/* AF_XDP or ZCTAP zero-copy */
 	struct xsk_buff_pool  *xsk_pool;
+	struct zctap_ifq      *zctap_ifq;
 
 	struct work_struct     recover_work;
 
@@ -654,6 +662,7 @@ struct mlx5e_rq {
 
 enum mlx5e_channel_state {
 	MLX5E_CHANNEL_STATE_XSK,
+	MLX5E_CHANNEL_STATE_ZCTAP,
 	MLX5E_CHANNEL_NUM_STATES
 };
 
@@ -774,9 +783,13 @@ struct mlx5e_xsk {
 	 * distinguish between zero-copy and non-zero-copy UMEMs, so
 	 * rely on our mechanism.
 	 */
-	struct xsk_buff_pool **pools;
+	union {
+		struct xsk_buff_pool **pools;
+		struct zctap_ifq **ifq_tbl;
+	};
 	u16 refcnt;
 	bool ever_used;
+	bool is_pool;
 };
 
 /* Temporary storage for variables that are allocated when struct mlx5e_priv is

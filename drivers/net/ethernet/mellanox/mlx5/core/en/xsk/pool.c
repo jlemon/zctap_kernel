@@ -27,7 +27,10 @@ static int mlx5e_xsk_get_pools(struct mlx5e_xsk *xsk)
 				     sizeof(*xsk->pools), GFP_KERNEL);
 		if (unlikely(!xsk->pools))
 			return -ENOMEM;
+		xsk->is_pool = true;
 	}
+	if (!xsk->is_pool)
+		return -EINVAL;
 
 	xsk->refcnt++;
 	xsk->ever_used = true;
@@ -72,6 +75,7 @@ void mlx5e_build_xsk_param(struct xsk_buff_pool *pool, struct mlx5e_xsk_param *x
 {
 	xsk->headroom = xsk_pool_get_headroom(pool);
 	xsk->chunk_size = xsk_pool_get_chunk_size(pool);
+	xsk->hd_split = 0;
 }
 
 static int mlx5e_xsk_enable_locked(struct mlx5e_priv *priv,
