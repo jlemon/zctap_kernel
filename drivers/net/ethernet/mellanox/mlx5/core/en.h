@@ -399,6 +399,7 @@ struct mlx5e_dma_info {
 		struct page *page;
 		struct xdp_buff *xsk;
 	};
+	bool zctap_frag;
 };
 
 /* XDP packets can be transmitted in different ways. On completion, we need to

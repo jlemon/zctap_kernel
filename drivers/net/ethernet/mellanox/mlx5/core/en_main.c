@@ -330,6 +330,7 @@ static void mlx5e_init_frags_partition(struct mlx5e_rq *rq)
 				if (prev)
 					prev->last_in_page = true;
 			}
+			next_frag.di->zctap_frag = !!frag_info[f].frag_source;
 			*frag = next_frag;
 
 			/* prepare next */
