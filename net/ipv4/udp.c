@@ -2804,6 +2804,10 @@ __poll_t udp_poll(struct file *file, struct socket *sock, poll_table *wait)
 	    !(sk->sk_shutdown & RCV_SHUTDOWN) && first_packet_length(sk) == -1)
 		mask &= ~(EPOLLIN | EPOLLRDNORM);
 
+	if (sk->sk_prot->stream_memory_read &&
+	    sk->sk_prot->stream_memory_read(sk))
+		mask |= EPOLLIN | EPOLLRDNORM;
+
 	return mask;
 
 }
