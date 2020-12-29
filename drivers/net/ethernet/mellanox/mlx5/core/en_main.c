@@ -443,6 +443,7 @@ static int mlx5e_alloc_rq(struct mlx5e_channel *c,
 
 	rq->buff.map_dir = params->xdp_prog ? DMA_BIDIRECTIONAL : DMA_FROM_DEVICE;
 	rq->buff.headroom = mlx5e_get_rq_headroom(mdev, params, xsk);
+	rq->buff.frame0_split = hd_split ? xsk->hd_split : 0;
 	pool_size = 1 << params->log_rq_mtu_frames;
 
 	switch (rq->wq_type) {

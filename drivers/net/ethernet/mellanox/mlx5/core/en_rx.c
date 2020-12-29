@@ -1176,7 +1176,9 @@ mlx5e_skb_from_cqe_nonlinear(struct mlx5e_rq *rq, struct mlx5_cqe64 *cqe,
 {
 	struct mlx5e_rq_frag_info *frag_info = &rq->wqe.info.arr[0];
 	struct mlx5e_wqe_frag_info *head_wi = wi;
-	u16 headlen      = min_t(u32, MLX5E_RX_MAX_HEAD, cqe_bcnt);
+	u8 hd_split	 = rq->buff.frame0_split;
+	u16 header_len	 = hd_split ? hd_split : MLX5E_RX_MAX_HEAD;
+	u16 headlen      = min_t(u32, header_len, cqe_bcnt);
 	u16 frag_headlen = headlen;
 	u16 byte_cnt     = cqe_bcnt - headlen;
 	struct sk_buff *skb;
@@ -1185,13 +1187,23 @@ mlx5e_skb_from_cqe_nonlinear(struct mlx5e_rq *rq, struct mlx5_cqe64 *cqe,
 	 * might spread among multiple pages.
 	 */
 	skb = napi_alloc_skb(rq->cq.napi,
-			     ALIGN(MLX5E_RX_MAX_HEAD, sizeof(long)));
+			     ALIGN(header_len, sizeof(long)));
 	if (unlikely(!skb)) {
 		rq->stats->buff_alloc_err++;
 		return NULL;
 	}
 
 	net_prefetchw(skb->data);
+
+	if (hd_split) {
+		/* first frag is only headers, should skip this frag and
+		 * assume that all of the headers already copied to the skb
+		 * inline data.
+		 */
+		frag_info++;
+		frag_headlen = 0;
+		wi++;
+	}
 
 	while (byte_cnt) {
 		u16 frag_consumed_bytes =

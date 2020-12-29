@@ -608,6 +608,7 @@ struct mlx5e_rq {
 		u16            headroom;
 		u32            frame0_sz;
 		u8             map_dir;   /* dma map direction */
+		u8	       frame0_split;
 	} buff;
 
 	struct device         *pdev;
