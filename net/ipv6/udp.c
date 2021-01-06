@@ -48,6 +48,7 @@
 #include <net/inet6_hashtables.h>
 #include <net/busy_poll.h>
 #include <net/sock_reuseport.h>
+#include <net/zctap.h>
 
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
@@ -627,7 +628,12 @@ static int __udpv6_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 		sk_mark_napi_id_once(sk, skb);
 	}
 
-	rc = __udp_enqueue_schedule_skb(sk, skb);
+#ifdef CONFIG_ZCTAP
+	if (sock_flag(sk, SOCK_ZEROCOPY_RX))
+		rc = zctap_deliver_udp(sk, skb);
+	else
+#endif
+		rc = __udp_enqueue_schedule_skb(sk, skb);
 	if (rc < 0) {
 		int is_udplite = IS_UDPLITE(sk);
 
