@@ -632,8 +632,9 @@ int __zerocopy_sg_from_iter(struct sock *sk, struct sk_buff *skb,
 		if (frag == MAX_SKB_FRAGS)
 			return -EMSGSIZE;
 
-		copied = iov_iter_get_pages(from, pages, length,
-					    MAX_SKB_FRAGS - frag, &start);
+		copied = iov_iter_udata_get_pages(from, pages, length,
+						  MAX_SKB_FRAGS - frag, &start,
+					          sk->sk_user_data);
 		if (copied < 0)
 			return -EFAULT;
 
