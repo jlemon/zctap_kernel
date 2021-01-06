@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Zero Copy Transfer
+#
+config ZCTAP
+	bool "Zerocopy transfer"
+	depends on PCI
+	select DMA_SHARED_BUFFER
+	help
+	  Experimental zerocopy transfer

@@ -2112,6 +2112,14 @@ void *__pskb_pull_tail(struct sk_buff *skb, int delta)
 	 */
 	int i, k, eat = (skb->tail + delta) - skb->end;
 
+#if 0
+	if (skb_fixed(skb)) {
+		pr_err("fixed pull %px: head:%d  delta:%d\n",
+		    skb, skb_headlen(skb), delta);
+		return NULL;
+	}
+#endif
+
 	if (eat > 0 || skb_cloned(skb)) {
 		if (pskb_expand_head(skb, 0, eat > 0 ? eat + 128 : 0,
 				     GFP_ATOMIC))
@@ -5288,6 +5296,11 @@ bool skb_try_coalesce(struct sk_buff *to, struct sk_buff *from,
 		return false;
 
 	if (len <= skb_tailroom(to)) {
+if (skb_fixed(from)) {
+  pr_err_ratelimited("copy %d from skb %px, hdr %d to skb %px, tail %d, f:%d\n",
+    len, from, skb_headlen(from), to, skb_tailroom(to), skb_fixed(to));
+  return false;
+}
 		if (len)
 			BUG_ON(skb_copy_bits(from, 0, skb_put(to, len), len));
 		*delta_truesize = 0;
