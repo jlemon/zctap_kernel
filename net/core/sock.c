@@ -1226,11 +1226,12 @@ set_sndbuf:
 			ret = -ENOTSUPP;
 			break;
 		}
-		if (val < 0 || val > 1) {
+		if (val < 0 || val > 3) {
 			ret = -EINVAL;
 			break;
 		}
-		sock_valbool_flag(sk, SOCK_ZEROCOPY, valbool);
+		sock_valbool_flag(sk, SOCK_ZEROCOPY, val & 1);
+		sock_valbool_flag(sk, SOCK_ZEROCOPY_RX, val & 2);
 		break;
 
 	case SO_TXTIME:
