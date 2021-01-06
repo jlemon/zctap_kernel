@@ -585,6 +585,7 @@ enum mlx5e_rq_flag {
 struct mlx5e_rq_frag_info {
 	int frag_size;
 	int frag_stride;
+	int frag_source;
 };
 
 struct mlx5e_rq_frags_info {

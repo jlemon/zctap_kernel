@@ -12,14 +12,20 @@ struct mlx5e_xsk_param {
 	struct xsk_buff_pool      *pool;
 };
 
+struct mlx5e_zctap_param {
+	u8			   split_offset;
+};
+
 enum mlx5e_extension_type {
 	MLX5E_EXT_XSK,
+	MLX5E_EXT_ZCTAP,
 };
 
 struct mlx5e_extension_param {
 	enum mlx5e_extension_type   type;
 	union {
 		struct mlx5e_xsk_param xsk;
+		struct mlx5e_zctap_param zctap;
 	};
 };
 

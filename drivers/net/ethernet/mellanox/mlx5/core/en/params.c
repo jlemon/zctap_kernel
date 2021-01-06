@@ -81,11 +81,16 @@ u8 mlx5e_mpwqe_log_pkts_per_wqe(struct mlx5e_params *params,
 bool mlx5e_rx_is_linear_skb(struct mlx5e_params *params,
 			    struct mlx5e_extension_param *ext)
 {
+	u32 linear_frag_sz;
+
+	if (mlx5e_extension_is(ext, MLX5E_EXT_ZCTAP))
+		return false;
+
 	/* AF_XDP allocates SKBs on XDP_PASS - ensure they don't occupy more
 	 * than one page. For this, check both with and without xsk.
 	 */
-	u32 linear_frag_sz = max(mlx5e_rx_get_linear_frag_sz(params, ext),
-				 mlx5e_rx_get_linear_frag_sz(params, NULL));
+	linear_frag_sz = max(mlx5e_rx_get_linear_frag_sz(params, ext),
+			     mlx5e_rx_get_linear_frag_sz(params, NULL));
 
 	return !params->lro_en && linear_frag_sz <= PAGE_SIZE;
 }
@@ -362,7 +367,7 @@ void mlx5e_build_create_cq_param(struct mlx5e_create_cq_param *ccp, struct mlx5e
 	};
 }
 
-#define DEFAULT_FRAG_SIZE (2048)
+#define DEFAULT_FRAG_SIZE	2048
 
 static void mlx5e_build_rq_frags_info(struct mlx5_core_dev *mdev,
 				      struct mlx5e_params *params,
@@ -370,9 +375,12 @@ static void mlx5e_build_rq_frags_info(struct mlx5_core_dev *mdev,
 				      struct mlx5e_rq_frags_info *info)
 {
 	u32 byte_count = MLX5E_SW2HW_MTU(params, params->sw_mtu);
-	int frag_size_max = DEFAULT_FRAG_SIZE;
+	bool hdr_split = mlx5e_extension_is(ext, MLX5E_EXT_ZCTAP);
+	int frag_size_max;
 	u32 buf_size = 0;
 	int i;
+
+	frag_size_max = hdr_split ? PAGE_SIZE : DEFAULT_FRAG_SIZE;
 
 	if (mlx5_fpga_is_ipsec_device(mdev))
 		byte_count += MLX5E_METADATA_ETHER_LEN;
@@ -395,14 +403,28 @@ static void mlx5e_build_rq_frags_info(struct mlx5_core_dev *mdev,
 		frag_size_max = PAGE_SIZE;
 
 	i = 0;
+
+	if (hdr_split) {
+		int frag_size = ext->zctap.split_offset;
+		// Start with one fragment for all headers (implementing HDS)
+		info->arr[0].frag_size = frag_size;
+		info->arr[0].frag_stride = roundup_pow_of_two(PAGE_SIZE);
+		buf_size += frag_size;
+		// Now, continue with the payload frags.
+		i = 1;
+	}
+
 	while (buf_size < byte_count) {
 		int frag_size = byte_count - buf_size;
+		int frag_stride;
 
 		if (i < MLX5E_MAX_RX_FRAGS - 1)
 			frag_size = min(frag_size, frag_size_max);
 
+		frag_stride = hdr_split ? PAGE_SIZE : frag_size;
 		info->arr[i].frag_size = frag_size;
-		info->arr[i].frag_stride = roundup_pow_of_two(frag_size);
+		info->arr[i].frag_stride = roundup_pow_of_two(frag_stride);
+		info->arr[i].frag_source = hdr_split;
 
 		buf_size += frag_size;
 		i++;
