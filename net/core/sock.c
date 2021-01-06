@@ -1218,17 +1218,19 @@ set_sndbuf:
 			if (!((sk->sk_type == SOCK_STREAM &&
 			       sk->sk_protocol == IPPROTO_TCP) ||
 			      (sk->sk_type == SOCK_DGRAM &&
-			       sk->sk_protocol == IPPROTO_UDP)))
+			       sk->sk_protocol == IPPROTO_UDP))) {
 				ret = -ENOTSUPP;
+				break;
+			}
 		} else if (sk->sk_family != PF_RDS) {
 			ret = -ENOTSUPP;
+			break;
 		}
-		if (!ret) {
-			if (val < 0 || val > 1)
-				ret = -EINVAL;
-			else
-				sock_valbool_flag(sk, SOCK_ZEROCOPY, valbool);
+		if (val < 0 || val > 1) {
+			ret = -EINVAL;
+			break;
 		}
+		sock_valbool_flag(sk, SOCK_ZEROCOPY, valbool);
 		break;
 
 	case SO_TXTIME:
