@@ -124,6 +124,7 @@ int mlx5e_napi_poll(struct napi_struct *napi, int budget)
 	bool busy = false;
 	int work_done = 0;
 	u16 qos_sqs_size;
+	bool zctap_open;
 	bool xsk_open;
 	int i;
 
@@ -132,6 +133,7 @@ int mlx5e_napi_poll(struct napi_struct *napi, int budget)
 	qos_sqs = rcu_dereference(c->qos_sqs);
 
 	xsk_open = test_bit(MLX5E_CHANNEL_STATE_XSK, c->state);
+	zctap_open = test_bit(MLX5E_CHANNEL_STATE_ZCTAP, c->state);
 
 	ch_stats->poll++;
 
@@ -156,7 +158,7 @@ int mlx5e_napi_poll(struct napi_struct *napi, int budget)
 		busy |= mlx5e_poll_xdpsq_cq(&c->rq_xdpsq.cq);
 
 	if (likely(budget)) { /* budget=0 means: don't poll rx rings */
-		if (xsk_open)
+		if (xsk_open || zctap_open)
 			work_done = mlx5e_poll_rx_cq(&xskrq->cq, budget);
 
 		if (likely(budget - work_done))
@@ -180,6 +182,14 @@ int mlx5e_napi_poll(struct napi_struct *napi, int budget)
 				mlx5e_post_rx_mpwqes,
 				mlx5e_post_rx_wqes,
 				rq);
+
+	if (zctap_open) {
+		busy_xsk |= INDIRECT_CALL_2(xskrq->post_wqes,
+					    mlx5e_post_rx_mpwqes,
+					    mlx5e_post_rx_wqes,
+					    xskrq);
+	}
+
 	if (xsk_open) {
 		busy |= mlx5e_poll_xdpsq_cq(&xsksq->cq);
 		busy_xsk |= mlx5e_napi_xsk_post(xsksq, xskrq);
@@ -224,6 +234,11 @@ int mlx5e_napi_poll(struct napi_struct *napi, int budget)
 	mlx5e_cq_arm(&c->icosq.cq);
 	mlx5e_cq_arm(&c->async_icosq.cq);
 	mlx5e_cq_arm(&c->xdpsq.cq);
+
+	if (zctap_open) {
+		mlx5e_handle_rx_dim(xskrq);
+		mlx5e_cq_arm(&xskrq->cq);
+	}
 
 	if (xsk_open) {
 		mlx5e_handle_rx_dim(xskrq);

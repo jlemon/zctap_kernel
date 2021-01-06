@@ -49,6 +49,7 @@
 #include "en_accel/tls_rxtx.h"
 #include "en/xdp.h"
 #include "en/xsk/rx.h"
+#include "en/zctap.h"
 #include "en/health.h"
 #include "en/params.h"
 #include "devlink.h"
@@ -415,6 +416,9 @@ static int mlx5e_alloc_rx_wqes(struct mlx5e_rq *rq, u16 ix, u8 wqe_bulk)
 			return -ENOMEM;
 	}
 
+	if (rq->zctap_ifq && !mlx5e_zctap_avail(rq, wqe_bulk))
+		return -ENOMEM;
+
 	for (i = 0; i < wqe_bulk; i++) {
 		struct mlx5e_rx_wqe_cyc *wqe = mlx5_wq_cyc_get_wqe(wq, ix + i);
 
@@ -423,11 +427,17 @@ static int mlx5e_alloc_rx_wqes(struct mlx5e_rq *rq, u16 ix, u8 wqe_bulk)
 			goto free_wqes;
 	}
 
+	if (rq->zctap_ifq)
+		mlx5e_zctap_taken(rq);
+
 	return 0;
 
 free_wqes:
 	while (--i >= 0)
 		mlx5e_dealloc_rx_wqe(rq, ix + i);
+
+	if (rq->zctap_ifq)
+		mlx5e_zctap_taken(rq);
 
 	return err;
 }
@@ -441,6 +451,7 @@ mlx5e_add_skb_frag(struct mlx5e_rq *rq, struct sk_buff *skb,
 				di->addr + frag_offset,
 				len, DMA_FROM_DEVICE);
 	page_ref_inc(di->page);
+
 	skb_add_rx_frag(skb, skb_shinfo(skb)->nr_frags,
 			di->page, frag_offset, len, truesize);
 }
@@ -1794,12 +1805,16 @@ int mlx5e_rq_set_handlers(struct mlx5e_rq *rq, struct mlx5e_params *params,
 			netdev_err(netdev, "RX handler of MPWQE RQ is not set\n");
 			return -EINVAL;
 		}
+		if (mlx5e_extension_is(ext, MLX5E_EXT_ZCTAP)) {
+			netdev_err(netdev, "zctap does not support MPWQE\n");
+			return -EINVAL;
+		}
 		break;
 	default: /* MLX5_WQ_TYPE_CYCLIC */
 		rq->wqe.skb_from_cqe = mlx5e_extension_is(ext, MLX5E_EXT_XSK) ?
 				mlx5e_xsk_skb_from_cqe_linear :
 			mlx5e_extension_is(ext, MLX5E_EXT_ZCTAP) ?
-				mlx5e_skb_from_cqe_nonlinear :
+				mlx5e_zctap_skb_from_cqe_nonlinear :
 			mlx5e_rx_is_linear_skb(params, NULL) ?
 				mlx5e_skb_from_cqe_linear :
 				mlx5e_skb_from_cqe_nonlinear;
