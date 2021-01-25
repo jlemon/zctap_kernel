@@ -400,7 +400,7 @@ static int mlx5e_init_rxq_rq(struct mlx5e_channel *c, struct mlx5e_params *param
 }
 
 static int mlx5e_alloc_rq(struct mlx5e_params *params,
-			  struct mlx5e_xsk_param *xsk,
+			  struct mlx5e_extension_param *ext,
 			  struct mlx5e_rq_param *rqp,
 			  int node, struct mlx5e_rq *rq)
 {
@@ -421,7 +421,7 @@ static int mlx5e_alloc_rq(struct mlx5e_params *params,
 	RCU_INIT_POINTER(rq->xdp_prog, params->xdp_prog);
 
 	rq->buff.map_dir = params->xdp_prog ? DMA_BIDIRECTIONAL : DMA_FROM_DEVICE;
-	rq->buff.headroom = mlx5e_get_rq_headroom(mdev, params, xsk);
+	rq->buff.headroom = mlx5e_get_rq_headroom(mdev, params, ext);
 	pool_size = 1 << params->log_rq_mtu_frames;
 
 	switch (rq->wq_type) {
@@ -440,11 +440,12 @@ static int mlx5e_alloc_rq(struct mlx5e_params *params,
 		wq_sz = mlx5_wq_ll_get_size(&rq->mpwqe.wq);
 
 		pool_size = MLX5_MPWRQ_PAGES_PER_WQE <<
-			mlx5e_mpwqe_get_log_rq_size(params, xsk);
+			mlx5e_mpwqe_get_log_rq_size(params, ext);
 
-		rq->mpwqe.log_stride_sz = mlx5e_mpwqe_get_log_stride_size(mdev, params, xsk);
+		rq->mpwqe.log_stride_sz =
+			mlx5e_mpwqe_get_log_stride_size(mdev, params, ext);
 		rq->mpwqe.num_strides =
-			BIT(mlx5e_mpwqe_get_log_num_strides(mdev, params, xsk));
+			BIT(mlx5e_mpwqe_get_log_num_strides(mdev, params, ext));
 
 		rq->buff.frame0_sz = (1 << rq->mpwqe.log_stride_sz);
 
@@ -485,6 +486,10 @@ static int mlx5e_alloc_rq(struct mlx5e_params *params,
 
 		rq->mkey_be = cpu_to_be32(mdev->mlx5e_res.hw_objs.mkey.key);
 	}
+
+	err = mlx5e_rq_set_handlers(rq, params, ext);
+	if (err)
+		goto err_free_by_rq_type;
 
 	if (rq->xsk_pool) {
 		err = xdp_rxq_info_reg_mem_model(&rq->xdp_rxq,
@@ -835,13 +840,13 @@ void mlx5e_free_rx_descs(struct mlx5e_rq *rq)
 }
 
 int mlx5e_open_rq(struct mlx5e_params *params, struct mlx5e_rq_param *param,
-		  struct mlx5e_xsk_param *xsk, int node,
+		  struct mlx5e_extension_param *ext, int node,
 		  struct mlx5e_rq *rq)
 {
 	struct mlx5_core_dev *mdev = rq->mdev;
 	int err;
 
-	err = mlx5e_alloc_rq(params, xsk, param, node, rq);
+	err = mlx5e_alloc_rq(params, ext, param, node, rq);
 	if (err)
 		return err;
 
@@ -1969,16 +1974,16 @@ mlx5e_open_extension(struct mlx5e_priv *priv, int ix,
 		     struct mlx5e_params *params,
 		     struct mlx5e_channel *c)
 {
+	struct mlx5e_extension_param ext;
 	struct xsk_buff_pool *xsk_pool;
-	struct mlx5e_xsk_param xsk;
 	int err = 0;
 
 	if (params->xdp_prog) {
 		xsk_pool = mlx5e_xsk_get_pool(params, params->xsk, ix);
 
 		if (xsk_pool) {
-			mlx5e_build_xsk_param(xsk_pool, &xsk);
-			err = mlx5e_open_xsk(priv, params, &xsk, c);
+			mlx5e_build_xsk_param(xsk_pool, &ext);
+			err = mlx5e_open_xsk(priv, params, &ext, c);
 		}
 	}
 
@@ -3881,23 +3886,23 @@ static bool mlx5e_xsk_validate_mtu(struct net_device *netdev,
 	for (ix = 0; ix < chs->params.num_channels; ix++) {
 		struct xsk_buff_pool *xsk_pool =
 			mlx5e_xsk_get_pool(&chs->params, chs->params.xsk, ix);
-		struct mlx5e_xsk_param xsk;
+		struct mlx5e_extension_param ext;
 
 		if (!xsk_pool)
 			continue;
 
-		mlx5e_build_xsk_param(xsk_pool, &xsk);
+		mlx5e_build_xsk_param(xsk_pool, &ext);
 
-		if (!mlx5e_validate_xsk_param(new_params, &xsk, mdev)) {
-			u32 hr = mlx5e_get_linear_rq_headroom(new_params, &xsk);
+		if (!mlx5e_validate_xsk_param(new_params, &ext, mdev)) {
+			u32 hr = mlx5e_get_linear_rq_headroom(new_params, &ext);
 			int max_mtu_frame, max_mtu_page, max_mtu;
 
 			/* Two criteria must be met:
 			 * 1. HW MTU + all headrooms <= XSK frame size.
 			 * 2. Size of SKBs allocated on XDP_PASS <= PAGE_SIZE.
 			 */
-			max_mtu_frame = MLX5E_HW2SW_MTU(new_params, xsk.chunk_size - hr);
-			max_mtu_page = mlx5e_xdp_max_mtu(new_params, &xsk);
+			max_mtu_frame = MLX5E_HW2SW_MTU(new_params, ext.xsk.chunk_size - hr);
+			max_mtu_page = mlx5e_xdp_max_mtu(new_params, &ext);
 			max_mtu = min(max_mtu_frame, max_mtu_page);
 
 			netdev_err(netdev, "MTU %d is too big for an XSK running on channel %u. Try MTU <= %d\n",

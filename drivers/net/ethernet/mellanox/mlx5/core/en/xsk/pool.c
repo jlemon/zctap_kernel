@@ -68,8 +68,12 @@ static bool mlx5e_xsk_is_pool_sane(struct xsk_buff_pool *pool)
 		xsk_pool_get_chunk_size(pool) <= 0xffff;
 }
 
-void mlx5e_build_xsk_param(struct xsk_buff_pool *pool, struct mlx5e_xsk_param *xsk)
+void mlx5e_build_xsk_param(struct xsk_buff_pool *pool,
+			   struct mlx5e_extension_param *ext)
 {
+	struct mlx5e_xsk_param *xsk = &ext->xsk;
+
+	ext->type = MLX5E_EXT_XSK;
 	xsk->headroom = xsk_pool_get_headroom(pool);
 	xsk->chunk_size = xsk_pool_get_chunk_size(pool);
 	xsk->pool = pool;
@@ -79,7 +83,7 @@ static int mlx5e_xsk_enable_locked(struct mlx5e_priv *priv,
 				   struct xsk_buff_pool *pool, u16 ix)
 {
 	struct mlx5e_params *params = &priv->channels.params;
-	struct mlx5e_xsk_param xsk;
+	struct mlx5e_extension_param ext;
 	struct mlx5e_channel *c;
 	int err;
 
@@ -97,7 +101,7 @@ static int mlx5e_xsk_enable_locked(struct mlx5e_priv *priv,
 	if (unlikely(err))
 		goto err_unmap_pool;
 
-	mlx5e_build_xsk_param(pool, &xsk);
+	mlx5e_build_xsk_param(pool, &ext);
 
 	if (!test_bit(MLX5E_STATE_OPENED, &priv->state)) {
 		/* XSK objects will be created on open. */
@@ -113,7 +117,7 @@ static int mlx5e_xsk_enable_locked(struct mlx5e_priv *priv,
 
 	c = priv->channels.c[ix];
 
-	err = mlx5e_open_xsk(priv, params, &xsk, c);
+	err = mlx5e_open_xsk(priv, params, &ext, c);
 	if (unlikely(err))
 		goto err_remove_pool;
 
@@ -145,7 +149,7 @@ validate_closed:
 	/* Check the configuration in advance, rather than fail at a later stage
 	 * (in mlx5e_xdp_set or on open) and end up with no channels.
 	 */
-	if (!mlx5e_validate_xsk_param(params, &xsk, priv->mdev)) {
+	if (!mlx5e_validate_xsk_param(params, &ext, priv->mdev)) {
 		err = -EINVAL;
 		goto err_remove_pool;
 	}

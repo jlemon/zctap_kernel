@@ -35,9 +35,10 @@
 #include "en/xdp.h"
 #include "en/params.h"
 
-int mlx5e_xdp_max_mtu(struct mlx5e_params *params, struct mlx5e_xsk_param *xsk)
+int mlx5e_xdp_max_mtu(struct mlx5e_params *params,
+		      struct mlx5e_extension_param *ext)
 {
-	int hr = mlx5e_get_linear_rq_headroom(params, xsk);
+	int hr = mlx5e_get_linear_rq_headroom(params, ext);
 
 	/* Let S := SKB_DATA_ALIGN(sizeof(struct skb_shared_info)).
 	 * The condition checked in mlx5e_rx_is_linear_skb is:

@@ -12,16 +12,21 @@
 #define MLX5E_MIN_XSK_CHUNK_SIZE 2048
 
 bool mlx5e_validate_xsk_param(struct mlx5e_params *params,
-			      struct mlx5e_xsk_param *xsk,
+			      struct mlx5e_extension_param *ext,
 			      struct mlx5_core_dev *mdev)
 {
+	struct mlx5e_xsk_param *xsk = &ext->xsk;
+
+	if (ext->type != MLX5E_EXT_XSK)
+		return false;
+
 	/* AF_XDP doesn't support frames larger than PAGE_SIZE. */
 	if (xsk->chunk_size > PAGE_SIZE ||
 			xsk->chunk_size < MLX5E_MIN_XSK_CHUNK_SIZE)
 		return false;
 
 	/* Current MTU and XSK headroom don't allow packets to fit the frames. */
-	if (mlx5e_rx_get_min_frag_sz(params, xsk) > xsk->chunk_size)
+	if (mlx5e_rx_get_min_frag_sz(params, ext) > xsk->chunk_size)
 		return false;
 
 	/* frag_sz is different for regular and XSK RQs, so ensure that linear
@@ -29,25 +34,25 @@ bool mlx5e_validate_xsk_param(struct mlx5e_params *params,
 	 */
 	switch (params->rq_wq_type) {
 	case MLX5_WQ_TYPE_LINKED_LIST_STRIDING_RQ:
-		return mlx5e_rx_mpwqe_is_linear_skb(mdev, params, xsk);
+		return mlx5e_rx_mpwqe_is_linear_skb(mdev, params, ext);
 	default: /* MLX5_WQ_TYPE_CYCLIC */
-		return mlx5e_rx_is_linear_skb(params, xsk);
+		return mlx5e_rx_is_linear_skb(params, ext);
 	}
 }
 
 static void mlx5e_build_xsk_cparam(struct mlx5_core_dev *mdev,
 				   struct mlx5e_params *params,
-				   struct mlx5e_xsk_param *xsk,
+				   struct mlx5e_extension_param *ext,
 				   u16 q_counter,
 				   struct mlx5e_channel_param *cparam)
 {
-	mlx5e_build_rq_param(mdev, params, xsk, q_counter, &cparam->rq);
+	mlx5e_build_rq_param(mdev, params, ext, q_counter, &cparam->rq);
 	mlx5e_build_xdpsq_param(mdev, params, &cparam->xdp_sq);
 }
 
 static int mlx5e_init_xsk_rq(struct mlx5e_channel *c,
 			     struct mlx5e_params *params,
-			     struct mlx5e_xsk_param *xsk,
+			     struct mlx5e_extension_param *ext,
 			     struct mlx5e_rq *rq)
 {
 	struct mlx5_core_dev *mdev = c->mdev;
@@ -65,11 +70,11 @@ static int mlx5e_init_xsk_rq(struct mlx5e_channel *c,
 	rq->mdev         = mdev;
 	rq->hw_mtu       = MLX5E_SW2HW_MTU(params, params->sw_mtu);
 	rq->xdpsq        = &c->rq_xdpsq;
-	rq->xsk_pool     = xsk->pool;
+	rq->xsk_pool     = ext->xsk.pool;
 	rq->stats        = &c->priv->channel_stats[c->ix].xskrq;
 	rq->ptp_cyc2time = mlx5_rq_ts_translator(mdev);
 	rq_xdp_ix        = c->ix + params->num_channels * MLX5E_RQ_GROUP_XSK;
-	err = mlx5e_rq_set_handlers(rq, params, xsk);
+	err = mlx5e_rq_set_handlers(rq, params, ext);
 	if (err)
 		return err;
 
@@ -78,41 +83,41 @@ static int mlx5e_init_xsk_rq(struct mlx5e_channel *c,
 
 static int mlx5e_open_xsk_rq(struct mlx5e_channel *c, struct mlx5e_params *params,
 			     struct mlx5e_rq_param *rq_params,
-			     struct mlx5e_xsk_param *xsk)
+			     struct mlx5e_extension_param *ext)
 {
 	int err;
 
-	err = mlx5e_init_xsk_rq(c, params, xsk, &c->xskrq);
+	err = mlx5e_init_xsk_rq(c, params, ext, &c->xskrq);
 	if (err)
 		return err;
 
-	return mlx5e_open_rq(params, rq_params, xsk, cpu_to_node(c->cpu), &c->xskrq);
+	return mlx5e_open_rq(params, rq_params, ext, cpu_to_node(c->cpu), &c->xskrq);
 }
 
 int mlx5e_open_xsk(struct mlx5e_priv *priv, struct mlx5e_params *params,
-		   struct mlx5e_xsk_param *xsk, struct mlx5e_channel *c)
+		   struct mlx5e_extension_param *ext, struct mlx5e_channel *c)
 {
 	struct mlx5e_channel_param *cparam;
 	struct mlx5e_create_cq_param ccp;
 	int err;
 
-	mlx5e_build_create_cq_param(&ccp, c);
-
-	if (!mlx5e_validate_xsk_param(params, xsk, priv->mdev))
+	if (!mlx5e_validate_xsk_param(params, ext, priv->mdev))
 		return -EINVAL;
+
+	mlx5e_build_create_cq_param(&ccp, c);
 
 	cparam = kvzalloc(sizeof(*cparam), GFP_KERNEL);
 	if (!cparam)
 		return -ENOMEM;
 
-	mlx5e_build_xsk_cparam(priv->mdev, params, xsk, priv->q_counter, cparam);
+	mlx5e_build_xsk_cparam(priv->mdev, params, ext, priv->q_counter, cparam);
 
 	err = mlx5e_open_cq(c->priv, params->rx_cq_moderation, &cparam->rq.cqp, &ccp,
 			    &c->xskrq.cq);
 	if (unlikely(err))
 		goto err_free_cparam;
 
-	err = mlx5e_open_xsk_rq(c, params, &cparam->rq, xsk);
+	err = mlx5e_open_xsk_rq(c, params, &cparam->rq, ext);
 	if (unlikely(err))
 		goto err_close_rx_cq;
 
@@ -127,7 +132,8 @@ int mlx5e_open_xsk(struct mlx5e_priv *priv, struct mlx5e_params *params,
 	 * is disabled and then reenabled, but the SQ continues receiving CQEs
 	 * from the old buff pool.
 	 */
-	err = mlx5e_open_xdpsq(c, params, &cparam->xdp_sq, xsk->pool, &c->xsksq, true);
+	err = mlx5e_open_xdpsq(c, params, &cparam->xdp_sq, ext->xsk.pool,
+			       &c->xsksq, true);
 	if (unlikely(err))
 		goto err_close_tx_cq;
 

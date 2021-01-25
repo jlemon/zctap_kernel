@@ -18,8 +18,9 @@ static inline struct xsk_buff_pool *mlx5e_xsk_get_pool(struct mlx5e_params *para
 	return xsk->pools[ix];
 }
 
-struct mlx5e_xsk_param;
-void mlx5e_build_xsk_param(struct xsk_buff_pool *pool, struct mlx5e_xsk_param *xsk);
+struct mlx5e_extension_param;
+void mlx5e_build_xsk_param(struct xsk_buff_pool *pool,
+			   struct mlx5e_extension_param *ext);
 
 /* .ndo_bpf callback. */
 int mlx5e_xsk_setup_pool(struct net_device *dev, struct xsk_buff_pool *pool, u16 qid);
