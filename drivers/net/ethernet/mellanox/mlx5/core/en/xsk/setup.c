@@ -47,7 +47,6 @@ static void mlx5e_build_xsk_cparam(struct mlx5_core_dev *mdev,
 
 static int mlx5e_init_xsk_rq(struct mlx5e_channel *c,
 			     struct mlx5e_params *params,
-			     struct xsk_buff_pool *pool,
 			     struct mlx5e_xsk_param *xsk,
 			     struct mlx5e_rq *rq)
 {
@@ -66,7 +65,7 @@ static int mlx5e_init_xsk_rq(struct mlx5e_channel *c,
 	rq->mdev         = mdev;
 	rq->hw_mtu       = MLX5E_SW2HW_MTU(params, params->sw_mtu);
 	rq->xdpsq        = &c->rq_xdpsq;
-	rq->xsk_pool     = pool;
+	rq->xsk_pool     = xsk->pool;
 	rq->stats        = &c->priv->channel_stats[c->ix].xskrq;
 	rq->ptp_cyc2time = mlx5_rq_ts_translator(mdev);
 	rq_xdp_ix        = c->ix + params->num_channels * MLX5E_RQ_GROUP_XSK;
@@ -78,12 +77,12 @@ static int mlx5e_init_xsk_rq(struct mlx5e_channel *c,
 }
 
 static int mlx5e_open_xsk_rq(struct mlx5e_channel *c, struct mlx5e_params *params,
-			     struct mlx5e_rq_param *rq_params, struct xsk_buff_pool *pool,
+			     struct mlx5e_rq_param *rq_params,
 			     struct mlx5e_xsk_param *xsk)
 {
 	int err;
 
-	err = mlx5e_init_xsk_rq(c, params, pool, xsk, &c->xskrq);
+	err = mlx5e_init_xsk_rq(c, params, xsk, &c->xskrq);
 	if (err)
 		return err;
 
@@ -91,8 +90,7 @@ static int mlx5e_open_xsk_rq(struct mlx5e_channel *c, struct mlx5e_params *param
 }
 
 int mlx5e_open_xsk(struct mlx5e_priv *priv, struct mlx5e_params *params,
-		   struct mlx5e_xsk_param *xsk, struct xsk_buff_pool *pool,
-		   struct mlx5e_channel *c)
+		   struct mlx5e_xsk_param *xsk, struct mlx5e_channel *c)
 {
 	struct mlx5e_channel_param *cparam;
 	struct mlx5e_create_cq_param ccp;
@@ -114,7 +112,7 @@ int mlx5e_open_xsk(struct mlx5e_priv *priv, struct mlx5e_params *params,
 	if (unlikely(err))
 		goto err_free_cparam;
 
-	err = mlx5e_open_xsk_rq(c, params, &cparam->rq, pool, xsk);
+	err = mlx5e_open_xsk_rq(c, params, &cparam->rq, xsk);
 	if (unlikely(err))
 		goto err_close_rx_cq;
 
@@ -129,7 +127,7 @@ int mlx5e_open_xsk(struct mlx5e_priv *priv, struct mlx5e_params *params,
 	 * is disabled and then reenabled, but the SQ continues receiving CQEs
 	 * from the old buff pool.
 	 */
-	err = mlx5e_open_xdpsq(c, params, &cparam->xdp_sq, pool, &c->xsksq, true);
+	err = mlx5e_open_xdpsq(c, params, &cparam->xdp_sq, xsk->pool, &c->xsksq, true);
 	if (unlikely(err))
 		goto err_close_tx_cq;
 

@@ -72,6 +72,7 @@ void mlx5e_build_xsk_param(struct xsk_buff_pool *pool, struct mlx5e_xsk_param *x
 {
 	xsk->headroom = xsk_pool_get_headroom(pool);
 	xsk->chunk_size = xsk_pool_get_chunk_size(pool);
+	xsk->pool = pool;
 }
 
 static int mlx5e_xsk_enable_locked(struct mlx5e_priv *priv,
@@ -112,7 +113,7 @@ static int mlx5e_xsk_enable_locked(struct mlx5e_priv *priv,
 
 	c = priv->channels.c[ix];
 
-	err = mlx5e_open_xsk(priv, params, &xsk, pool, c);
+	err = mlx5e_open_xsk(priv, params, &xsk, c);
 	if (unlikely(err))
 		goto err_remove_pool;
 

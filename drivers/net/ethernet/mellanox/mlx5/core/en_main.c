@@ -1978,7 +1978,7 @@ mlx5e_open_extension(struct mlx5e_priv *priv, int ix,
 
 		if (xsk_pool) {
 			mlx5e_build_xsk_param(xsk_pool, &xsk);
-			err = mlx5e_open_xsk(priv, params, &xsk, xsk_pool, c);
+			err = mlx5e_open_xsk(priv, params, &xsk, c);
 		}
 	}
 
