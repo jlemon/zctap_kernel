@@ -77,15 +77,17 @@ static inline bool mlx5e_extension_is(struct mlx5e_extension_param *ext,
 
 static inline bool mlx5e_extension_avail(struct mlx5e_params *params, u16 ix)
 {
+	struct mlx5e_zctap *zctap = params->zctap;
 	struct mlx5e_xsk *xsk = params->xsk;
 
 	if (unlikely(ix >= params->num_channels))
                 return false;
 
-	if (!xsk)
+	if (!xsk || !zctap)
 		return false;
 
-	return !(xsk->pools && xsk->pools[ix]);
+	return !((xsk->pools && xsk->pools[ix]) ||
+		 (zctap->ifq_tbl && zctap->ifq_tbl[ix]));
 }
 
 static inline bool mlx5e_qid_get_ch_if_in_group(struct mlx5e_params *params,

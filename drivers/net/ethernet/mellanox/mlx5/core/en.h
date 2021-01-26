@@ -267,6 +267,7 @@ struct mlx5e_params {
 	u32 pflags;
 	struct bpf_prog *xdp_prog;
 	struct mlx5e_xsk *xsk;
+	struct mlx5e_zctap *zctap;
 	unsigned int sw_mtu;
 	int hard_mtu;
 	bool ptp_rx;
@@ -730,6 +731,7 @@ struct mlx5e_channel_stats {
 	struct mlx5e_sq_stats sq[MLX5E_MAX_NUM_TC];
 	struct mlx5e_rq_stats rq;
 	struct mlx5e_rq_stats xskrq;
+	struct mlx5e_rq_stats zctrq;
 	struct mlx5e_xdpsq_stats rq_xdpsq;
 	struct mlx5e_xdpsq_stats xdpsq;
 	struct mlx5e_xdpsq_stats xsksq;
@@ -798,6 +800,12 @@ struct mlx5e_xsk {
 	 * rely on our mechanism.
 	 */
 	struct xsk_buff_pool **pools;
+	u16 refcnt;
+	bool ever_used;
+};
+
+struct mlx5e_zctap {
+	struct zctap_ifq **ifq_tbl;
 	u16 refcnt;
 	bool ever_used;
 };
@@ -894,6 +902,7 @@ struct mlx5e_priv {
 	struct devlink_health_reporter *tx_reporter;
 	struct devlink_health_reporter *rx_reporter;
 	struct mlx5e_xsk           xsk;
+	struct mlx5e_zctap         zctap;
 #if IS_ENABLED(CONFIG_PCI_HYPERV_INTERFACE)
 	struct mlx5e_hv_vhca_stats_agent stats_agent;
 #endif

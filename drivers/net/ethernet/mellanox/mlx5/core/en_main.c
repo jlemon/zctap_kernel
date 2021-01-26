@@ -3529,12 +3529,19 @@ void mlx5e_fold_sw_stats64(struct mlx5e_priv *priv, struct rtnl_link_stats64 *s)
 	for (i = 0; i < priv->max_nch; i++) {
 		struct mlx5e_channel_stats *channel_stats = &priv->channel_stats[i];
 		struct mlx5e_rq_stats *xskrq_stats = &channel_stats->xskrq;
+		struct mlx5e_rq_stats *zctrq_stats = &channel_stats->zctrq;
 		struct mlx5e_rq_stats *rq_stats = &channel_stats->rq;
 		int j;
 
-		s->rx_packets   += rq_stats->packets + xskrq_stats->packets;
-		s->rx_bytes     += rq_stats->bytes + xskrq_stats->bytes;
-		s->multicast    += rq_stats->mcast_packets + xskrq_stats->mcast_packets;
+		s->rx_packets   += rq_stats->packets +
+				   xskrq_stats->packets +
+				   zctrq_stats->packets;
+		s->rx_bytes     += rq_stats->bytes +
+				   xskrq_stats->bytes +
+				   zctrq_stats->bytes;
+		s->multicast    += rq_stats->mcast_packets +
+				   xskrq_stats->mcast_packets +
+				   zctrq_stats->mcast_packets;
 
 		for (j = 0; j < priv->max_opened_tc; j++) {
 			struct mlx5e_sq_stats *sq_stats = &channel_stats->sq[j];
@@ -4675,8 +4682,10 @@ void mlx5e_build_nic_params(struct mlx5e_priv *priv, u16 mtu)
 		mlx5e_tunnel_inner_ft_supported(mdev);
 
 	/* Extensions */
-	if (priv->profile->rq_groups > MLX5E_NUM_RQ_GROUPS(REGULAR))
+	if (priv->profile->rq_groups > MLX5E_NUM_RQ_GROUPS(REGULAR)) {
 		params->xsk = &priv->xsk;
+		params->zctap = &priv->zctap;
+	}
 
 	/* Do not update netdev->features directly in here
 	 * on mlx5e_attach_netdev() we will call mlx5e_update_features()

@@ -305,6 +305,30 @@ static void mlx5e_stats_grp_sw_update_stats_xskrq(struct mlx5e_sw_stats *s,
 	s->rx_xsk_arfs_err               += xskrq_stats->arfs_err;
 }
 
+static void mlx5e_stats_grp_sw_update_stats_zctrq(struct mlx5e_sw_stats *s,
+						  struct mlx5e_rq_stats *zctrq_stats)
+{
+	s->rx_zct_packets                += zctrq_stats->packets;
+	s->rx_zct_bytes                  += zctrq_stats->bytes;
+	s->rx_zct_csum_complete          += zctrq_stats->csum_complete;
+	s->rx_zct_csum_unnecessary       += zctrq_stats->csum_unnecessary;
+	s->rx_zct_csum_unnecessary_inner += zctrq_stats->csum_unnecessary_inner;
+	s->rx_zct_csum_none              += zctrq_stats->csum_none;
+	s->rx_zct_ecn_mark               += zctrq_stats->ecn_mark;
+	s->rx_zct_removed_vlan_packets   += zctrq_stats->removed_vlan_packets;
+	s->rx_zct_xdp_drop               += zctrq_stats->xdp_drop;
+	s->rx_zct_xdp_redirect           += zctrq_stats->xdp_redirect;
+	s->rx_zct_wqe_err                += zctrq_stats->wqe_err;
+	s->rx_zct_mpwqe_filler_cqes      += zctrq_stats->mpwqe_filler_cqes;
+	s->rx_zct_mpwqe_filler_strides   += zctrq_stats->mpwqe_filler_strides;
+	s->rx_zct_oversize_pkts_sw_drop  += zctrq_stats->oversize_pkts_sw_drop;
+	s->rx_zct_buff_alloc_err         += zctrq_stats->buff_alloc_err;
+	s->rx_zct_cqe_compress_blks      += zctrq_stats->cqe_compress_blks;
+	s->rx_zct_cqe_compress_pkts      += zctrq_stats->cqe_compress_pkts;
+	s->rx_zct_congst_umr             += zctrq_stats->congst_umr;
+	s->rx_zct_arfs_err               += zctrq_stats->arfs_err;
+}
+
 static void mlx5e_stats_grp_sw_update_stats_rq_stats(struct mlx5e_sw_stats *s,
 						     struct mlx5e_rq_stats *rq_stats)
 {
@@ -463,6 +487,8 @@ static MLX5E_DECLARE_STATS_GRP_OP_UPDATE_STATS(sw)
 		/* AF_XDP zero-copy */
 		mlx5e_stats_grp_sw_update_stats_xskrq(s, &channel_stats->xskrq);
 		mlx5e_stats_grp_sw_update_stats_xsksq(s, &channel_stats->xsksq);
+
+		mlx5e_stats_grp_sw_update_stats_zctrq(s, &channel_stats->zctrq);
 
 		for (j = 0; j < priv->max_opened_tc; j++) {
 			mlx5e_stats_grp_sw_update_stats_sq(s, &channel_stats->sq[j]);
@@ -1875,6 +1901,28 @@ static const struct counter_desc xsksq_stats_desc[] = {
 	{ MLX5E_DECLARE_XSKSQ_STAT(struct mlx5e_xdpsq_stats, cqes) },
 };
 
+static const struct counter_desc zctrq_stats_desc[] = {
+	{ MLX5E_DECLARE_ZCTRQ_STAT(struct mlx5e_rq_stats, packets) },
+	{ MLX5E_DECLARE_ZCTRQ_STAT(struct mlx5e_rq_stats, bytes) },
+	{ MLX5E_DECLARE_ZCTRQ_STAT(struct mlx5e_rq_stats, csum_complete) },
+	{ MLX5E_DECLARE_ZCTRQ_STAT(struct mlx5e_rq_stats, csum_unnecessary) },
+	{ MLX5E_DECLARE_ZCTRQ_STAT(struct mlx5e_rq_stats, csum_unnecessary_inner) },
+	{ MLX5E_DECLARE_ZCTRQ_STAT(struct mlx5e_rq_stats, csum_none) },
+	{ MLX5E_DECLARE_ZCTRQ_STAT(struct mlx5e_rq_stats, ecn_mark) },
+	{ MLX5E_DECLARE_ZCTRQ_STAT(struct mlx5e_rq_stats, removed_vlan_packets) },
+	{ MLX5E_DECLARE_ZCTRQ_STAT(struct mlx5e_rq_stats, xdp_drop) },
+	{ MLX5E_DECLARE_ZCTRQ_STAT(struct mlx5e_rq_stats, xdp_redirect) },
+	{ MLX5E_DECLARE_ZCTRQ_STAT(struct mlx5e_rq_stats, wqe_err) },
+	{ MLX5E_DECLARE_ZCTRQ_STAT(struct mlx5e_rq_stats, mpwqe_filler_cqes) },
+	{ MLX5E_DECLARE_ZCTRQ_STAT(struct mlx5e_rq_stats, mpwqe_filler_strides) },
+	{ MLX5E_DECLARE_ZCTRQ_STAT(struct mlx5e_rq_stats, oversize_pkts_sw_drop) },
+	{ MLX5E_DECLARE_ZCTRQ_STAT(struct mlx5e_rq_stats, buff_alloc_err) },
+	{ MLX5E_DECLARE_ZCTRQ_STAT(struct mlx5e_rq_stats, cqe_compress_blks) },
+	{ MLX5E_DECLARE_ZCTRQ_STAT(struct mlx5e_rq_stats, cqe_compress_pkts) },
+	{ MLX5E_DECLARE_ZCTRQ_STAT(struct mlx5e_rq_stats, congst_umr) },
+	{ MLX5E_DECLARE_ZCTRQ_STAT(struct mlx5e_rq_stats, arfs_err) },
+};
+
 static const struct counter_desc ch_stats_desc[] = {
 	{ MLX5E_DECLARE_CH_STAT(struct mlx5e_ch_stats, events) },
 	{ MLX5E_DECLARE_CH_STAT(struct mlx5e_ch_stats, poll) },
@@ -1987,6 +2035,7 @@ static const struct counter_desc qos_sq_stats_desc[] = {
 #define NUM_RQ_XDPSQ_STATS		ARRAY_SIZE(rq_xdpsq_stats_desc)
 #define NUM_XSKRQ_STATS			ARRAY_SIZE(xskrq_stats_desc)
 #define NUM_XSKSQ_STATS			ARRAY_SIZE(xsksq_stats_desc)
+#define NUM_ZCTRQ_STATS			ARRAY_SIZE(zctrq_stats_desc)
 #define NUM_CH_STATS			ARRAY_SIZE(ch_stats_desc)
 #define NUM_PTP_SQ_STATS		ARRAY_SIZE(ptp_sq_stats_desc)
 #define NUM_PTP_CH_STATS		ARRAY_SIZE(ptp_ch_stats_desc)
@@ -2127,12 +2176,14 @@ static MLX5E_DECLARE_STATS_GRP_OP_NUM_STATS(channels)
 	       (NUM_RQ_XDPSQ_STATS * max_nch) +
 	       (NUM_XDPSQ_STATS * max_nch) +
 	       (NUM_XSKRQ_STATS * max_nch * priv->xsk.ever_used) +
-	       (NUM_XSKSQ_STATS * max_nch * priv->xsk.ever_used);
+	       (NUM_XSKSQ_STATS * max_nch * priv->xsk.ever_used) +
+	       (NUM_ZCTRQ_STATS * max_nch * priv->zctap.ever_used);
 }
 
 static MLX5E_DECLARE_STATS_GRP_OP_FILL_STRS(channels)
 {
 	bool is_xsk = priv->xsk.ever_used;
+	bool is_zct = priv->zctap.ever_used;
 	int max_nch = priv->max_nch;
 	int i, j, tc;
 
@@ -2151,6 +2202,9 @@ static MLX5E_DECLARE_STATS_GRP_OP_FILL_STRS(channels)
 		for (j = 0; j < NUM_RQ_XDPSQ_STATS; j++)
 			sprintf(data + (idx++) * ETH_GSTRING_LEN,
 				rq_xdpsq_stats_desc[j].format, i);
+		for (j = 0; j < NUM_ZCTRQ_STATS * is_zct; j++)
+			sprintf(data + (idx++) * ETH_GSTRING_LEN,
+				zctrq_stats_desc[j].format, i);
 	}
 
 	for (tc = 0; tc < priv->max_opened_tc; tc++)
@@ -2175,6 +2229,7 @@ static MLX5E_DECLARE_STATS_GRP_OP_FILL_STRS(channels)
 static MLX5E_DECLARE_STATS_GRP_OP_FILL_STATS(channels)
 {
 	bool is_xsk = priv->xsk.ever_used;
+	bool is_zct = priv->zctap.ever_used;
 	int max_nch = priv->max_nch;
 	int i, j, tc;
 
@@ -2197,6 +2252,10 @@ static MLX5E_DECLARE_STATS_GRP_OP_FILL_STATS(channels)
 			data[idx++] =
 				MLX5E_READ_CTR64_CPU(&priv->channel_stats[i].rq_xdpsq,
 						     rq_xdpsq_stats_desc, j);
+		for (j = 0; j < NUM_ZCTRQ_STATS * is_zct; j++)
+			data[idx++] =
+				MLX5E_READ_CTR64_CPU(&priv->channel_stats[i].zctrq,
+						     zctrq_stats_desc, j);
 	}
 
 	for (tc = 0; tc < priv->max_opened_tc; tc++)
