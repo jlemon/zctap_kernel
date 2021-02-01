@@ -4605,7 +4605,7 @@ void mlx5e_build_rss_params(struct mlx5e_rss_params *rss_params,
 			tirc_default_config[tt].rx_hash_fields;
 }
 
-void mlx5e_build_nic_params(struct mlx5e_priv *priv, struct mlx5e_xsk *xsk, u16 mtu)
+void mlx5e_build_nic_params(struct mlx5e_priv *priv, u16 mtu)
 {
 	struct mlx5e_rss_params *rss_params = &priv->rss_params;
 	struct mlx5e_params *params = &priv->channels.params;
@@ -4674,8 +4674,9 @@ void mlx5e_build_nic_params(struct mlx5e_priv *priv, struct mlx5e_xsk *xsk, u16 
 	params->tunneled_offload_en =
 		mlx5e_tunnel_inner_ft_supported(mdev);
 
-	/* AF_XDP */
-	params->xsk = xsk;
+	/* Extensions */
+	if (priv->profile->rq_groups > MLX5E_NUM_RQ_GROUPS(REGULAR))
+		params->xsk = &priv->xsk;
 
 	/* Do not update netdev->features directly in here
 	 * on mlx5e_attach_netdev() we will call mlx5e_update_features()
@@ -4908,7 +4909,7 @@ static int mlx5e_nic_init(struct mlx5_core_dev *mdev,
 	struct devlink_port *dl_port;
 	int err;
 
-	mlx5e_build_nic_params(priv, &priv->xsk, netdev->mtu);
+	mlx5e_build_nic_params(priv, netdev->mtu);
 	mlx5e_vxlan_set_netdev_info(priv);
 
 	mlx5e_timestamp_init(priv);
