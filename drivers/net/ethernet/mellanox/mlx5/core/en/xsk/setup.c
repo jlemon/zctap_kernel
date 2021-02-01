@@ -73,7 +73,7 @@ static int mlx5e_init_xsk_rq(struct mlx5e_channel *c,
 	rq->xsk_pool     = ext->xsk.pool;
 	rq->stats        = &c->priv->channel_stats[c->ix].xskrq;
 	rq->ptp_cyc2time = mlx5_rq_ts_translator(mdev);
-	rq_xdp_ix        = c->ix + params->num_channels * MLX5E_RQ_GROUP_XSK;
+	rq_xdp_ix        = c->ix + params->num_channels * MLX5E_RQ_GROUP_EXTENSION;
 	err = mlx5e_rq_set_handlers(rq, params, ext);
 	if (err)
 		return err;
@@ -197,7 +197,7 @@ static int mlx5e_redirect_xsk_rqt(struct mlx5e_priv *priv, u16 ix, u32 rqn)
 		},
 	};
 
-	u32 rqtn = priv->xsk_tir[ix].rqt.rqtn;
+	u32 rqtn = priv->extension_tir[ix].rqt.rqtn;
 
 	return mlx5e_redirect_rqt(priv, rqtn, 1, direct_rrp);
 }

@@ -4969,17 +4969,17 @@ static int mlx5e_init_nic_rx(struct mlx5e_priv *priv)
 	if (err)
 		goto err_destroy_indirect_tirs;
 
-	err = mlx5e_create_direct_rqts(priv, priv->xsk_tir, max_nch);
+	err = mlx5e_create_direct_rqts(priv, priv->extension_tir, max_nch);
 	if (unlikely(err))
 		goto err_destroy_direct_tirs;
 
-	err = mlx5e_create_direct_tirs(priv, priv->xsk_tir, max_nch);
+	err = mlx5e_create_direct_tirs(priv, priv->extension_tir, max_nch);
 	if (unlikely(err))
-		goto err_destroy_xsk_rqts;
+		goto err_destroy_extension_rqts;
 
 	err = mlx5e_create_direct_rqts(priv, &priv->ptp_tir, 1);
 	if (err)
-		goto err_destroy_xsk_tirs;
+		goto err_destroy_extension_tirs;
 
 	err = mlx5e_create_direct_tirs(priv, &priv->ptp_tir, 1);
 	if (err)
@@ -5013,10 +5013,10 @@ err_destroy_ptp_direct_tir:
 	mlx5e_destroy_direct_tirs(priv, &priv->ptp_tir, 1);
 err_destroy_ptp_rqt:
 	mlx5e_destroy_direct_rqts(priv, &priv->ptp_tir, 1);
-err_destroy_xsk_tirs:
-	mlx5e_destroy_direct_tirs(priv, priv->xsk_tir, max_nch);
-err_destroy_xsk_rqts:
-	mlx5e_destroy_direct_rqts(priv, priv->xsk_tir, max_nch);
+err_destroy_extension_tirs:
+	mlx5e_destroy_direct_tirs(priv, priv->extension_tir, max_nch);
+err_destroy_extension_rqts:
+	mlx5e_destroy_direct_rqts(priv, priv->extension_tir, max_nch);
 err_destroy_direct_tirs:
 	mlx5e_destroy_direct_tirs(priv, priv->direct_tir, max_nch);
 err_destroy_indirect_tirs:
@@ -5041,8 +5041,8 @@ static void mlx5e_cleanup_nic_rx(struct mlx5e_priv *priv)
 	mlx5e_destroy_flow_steering(priv);
 	mlx5e_destroy_direct_tirs(priv, &priv->ptp_tir, 1);
 	mlx5e_destroy_direct_rqts(priv, &priv->ptp_tir, 1);
-	mlx5e_destroy_direct_tirs(priv, priv->xsk_tir, max_nch);
-	mlx5e_destroy_direct_rqts(priv, priv->xsk_tir, max_nch);
+	mlx5e_destroy_direct_tirs(priv, priv->extension_tir, max_nch);
+	mlx5e_destroy_direct_rqts(priv, priv->extension_tir, max_nch);
 	mlx5e_destroy_direct_tirs(priv, priv->direct_tir, max_nch);
 	mlx5e_destroy_indirect_tirs(priv);
 	mlx5e_destroy_direct_rqts(priv, priv->direct_tir, max_nch);
@@ -5150,7 +5150,7 @@ static const struct mlx5e_profile mlx5e_nic_profile = {
 	.update_carrier	   = mlx5e_update_carrier,
 	.rx_handlers       = &mlx5e_rx_handlers_nic,
 	.max_tc		   = MLX5E_MAX_NUM_TC,
-	.rq_groups	   = MLX5E_NUM_RQ_GROUPS(XSK),
+	.rq_groups	   = MLX5E_NUM_RQ_GROUPS(EXTENSION),
 	.stats_grps	   = mlx5e_nic_stats_grps,
 	.stats_grps_num	   = mlx5e_nic_stats_grps_num,
 	.rx_ptp_support    = true,

@@ -214,7 +214,9 @@ int mlx5e_xsk_setup_pool(struct net_device *dev, struct xsk_buff_pool *pool, u16
 	struct mlx5e_params *params = &priv->channels.params;
 	u16 ix;
 
-	if (unlikely(!mlx5e_qid_get_ch_if_in_group(params, qid, MLX5E_RQ_GROUP_XSK, &ix)))
+	if (unlikely(!mlx5e_qid_get_ch_if_in_group(params, qid,
+						   MLX5E_RQ_GROUP_EXTENSION,
+						   &ix)))
 		return -EINVAL;
 
 	return pool ? mlx5e_xsk_enable_pool(priv, pool, ix) :

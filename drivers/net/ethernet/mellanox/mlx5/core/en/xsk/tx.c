@@ -17,7 +17,9 @@ int mlx5e_xsk_wakeup(struct net_device *dev, u32 qid, u32 flags)
 	if (unlikely(!mlx5e_xdp_is_active(priv)))
 		return -ENETDOWN;
 
-	if (unlikely(!mlx5e_qid_get_ch_if_in_group(params, qid, MLX5E_RQ_GROUP_XSK, &ix)))
+	if (unlikely(!mlx5e_qid_get_ch_if_in_group(params, qid,
+						   MLX5E_RQ_GROUP_EXTENSION,
+						   &ix)))
 		return -EINVAL;
 
 	c = priv->channels.c[ix];
