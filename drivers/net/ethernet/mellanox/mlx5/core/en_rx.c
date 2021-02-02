@@ -284,12 +284,16 @@ static inline int mlx5e_page_alloc_pool(struct mlx5e_rq *rq,
 }
 
 static inline int mlx5e_page_alloc(struct mlx5e_rq *rq,
-				   struct mlx5e_dma_info *dma_info)
+				   struct mlx5e_dma_info *dma_info,
+				   bool zctap_frag)
 {
 	if (rq->xsk_pool)
 		return mlx5e_xsk_page_alloc_pool(rq, dma_info);
-	else
-		return mlx5e_page_alloc_pool(rq, dma_info);
+
+	if (zctap_frag)
+		return mlx5e_zctap_get_page(rq, dma_info);
+
+	return mlx5e_page_alloc_pool(rq, dma_info);
 }
 
 void mlx5e_page_dma_unmap(struct mlx5e_rq *rq, struct mlx5e_dma_info *dma_info)
@@ -316,8 +320,11 @@ void mlx5e_page_release_dynamic(struct mlx5e_rq *rq,
 
 static inline void mlx5e_page_release(struct mlx5e_rq *rq,
 				      struct mlx5e_dma_info *dma_info,
-				      bool recycle)
+				      bool recycle, bool zctap_frag)
 {
+	if (zctap_frag)
+		return mlx5e_zctap_put_page(rq, dma_info, recycle);
+
 	if (rq->xsk_pool)
 		/* The `recycle` parameter is ignored, and the page is always
 		 * put into the Reuse Ring, because there is no way to return
@@ -339,7 +346,7 @@ static inline int mlx5e_get_rx_frag(struct mlx5e_rq *rq,
 		 * offset) should just use the new one without replenishing again
 		 * by themselves.
 		 */
-		err = mlx5e_page_alloc(rq, frag->di);
+		err = mlx5e_page_alloc(rq, frag->di, frag->zctap_frag);
 
 	return err;
 }
@@ -349,7 +356,7 @@ static inline void mlx5e_put_rx_frag(struct mlx5e_rq *rq,
 				     bool recycle)
 {
 	if (frag->last_in_page)
-		mlx5e_page_release(rq, frag->di, recycle);
+		mlx5e_page_release(rq, frag->di, recycle, frag->zctap_frag);
 }
 
 static inline struct mlx5e_wqe_frag_info *get_frag(struct mlx5e_rq *rq, u16 ix)
@@ -486,7 +493,7 @@ mlx5e_free_rx_mpwqe(struct mlx5e_rq *rq, struct mlx5e_mpw_info *wi, bool recycle
 
 	for (i = 0; i < MLX5_MPWRQ_PAGES_PER_WQE; i++)
 		if (no_xdp_xmit || !test_bit(i, wi->xdp_xmit_bitmap))
-			mlx5e_page_release(rq, &dma_info[i], recycle);
+			mlx5e_page_release(rq, &dma_info[i], recycle, false);
 }
 
 static void mlx5e_post_rx_mpwqe(struct mlx5e_rq *rq, u8 n)
@@ -530,7 +537,7 @@ static int mlx5e_alloc_rx_mpwqe(struct mlx5e_rq *rq, u16 ix)
 	memcpy(umr_wqe, &rq->mpwqe.umr_wqe, offsetof(struct mlx5e_umr_wqe, inline_mtts));
 
 	for (i = 0; i < MLX5_MPWRQ_PAGES_PER_WQE; i++, dma_info++) {
-		err = mlx5e_page_alloc(rq, dma_info);
+		err = mlx5e_page_alloc(rq, dma_info, false);
 		if (unlikely(err))
 			goto err_unmap;
 		umr_wqe->inline_mtts[i].ptag = cpu_to_be64(dma_info->addr | MLX5_EN_WR);
@@ -560,7 +567,7 @@ static int mlx5e_alloc_rx_mpwqe(struct mlx5e_rq *rq, u16 ix)
 err_unmap:
 	while (--i >= 0) {
 		dma_info--;
-		mlx5e_page_release(rq, dma_info, true);
+		mlx5e_page_release(rq, dma_info, true, false);
 	}
 
 err:

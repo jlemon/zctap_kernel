@@ -536,6 +536,7 @@ struct mlx5e_wqe_frag_info {
 	struct mlx5e_dma_info *di;
 	u32 offset;
 	bool last_in_page;
+	bool zctap_frag;
 };
 
 struct mlx5e_umr_dma_info {
