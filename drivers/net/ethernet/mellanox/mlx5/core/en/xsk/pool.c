@@ -87,7 +87,7 @@ static int mlx5e_xsk_enable_locked(struct mlx5e_priv *priv,
 	struct mlx5e_channel *c;
 	int err;
 
-	if (unlikely(mlx5e_xsk_get_pool(params, ix)))
+	if (!mlx5e_extension_avail(params, ix))
 		return -EBUSY;
 
 	if (unlikely(!mlx5e_xsk_is_pool_sane(pool)))

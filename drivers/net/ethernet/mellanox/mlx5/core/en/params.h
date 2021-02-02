@@ -69,6 +69,19 @@ static inline bool mlx5e_extension_is(struct mlx5e_extension_param *ext,
 	return ext && ext->type == type;
 }
 
+static inline bool mlx5e_extension_avail(struct mlx5e_params *params, u16 ix)
+{
+	struct mlx5e_xsk *xsk = params->xsk;
+
+	if (unlikely(ix >= params->num_channels))
+                return false;
+
+	if (!xsk)
+		return false;
+
+	return !(xsk->pools && xsk->pools[ix]);
+}
+
 static inline bool mlx5e_qid_get_ch_if_in_group(struct mlx5e_params *params,
 						u16 qid,
 						enum mlx5e_rq_group group,
