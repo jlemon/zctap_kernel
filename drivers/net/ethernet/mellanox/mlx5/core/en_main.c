@@ -1979,7 +1979,7 @@ mlx5e_open_extension(struct mlx5e_priv *priv, int ix,
 	int err = 0;
 
 	if (params->xdp_prog) {
-		xsk_pool = mlx5e_xsk_get_pool(params, params->xsk, ix);
+		xsk_pool = mlx5e_xsk_get_pool(params, ix);
 
 		if (xsk_pool) {
 			mlx5e_build_xsk_param(xsk_pool, &ext);
@@ -3885,7 +3885,7 @@ static bool mlx5e_xsk_validate_mtu(struct net_device *netdev,
 
 	for (ix = 0; ix < chs->params.num_channels; ix++) {
 		struct xsk_buff_pool *xsk_pool =
-			mlx5e_xsk_get_pool(&chs->params, chs->params.xsk, ix);
+			mlx5e_xsk_get_pool(&chs->params, ix);
 		struct mlx5e_extension_param ext;
 
 		if (!xsk_pool)

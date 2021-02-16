@@ -87,7 +87,7 @@ static int mlx5e_xsk_enable_locked(struct mlx5e_priv *priv,
 	struct mlx5e_channel *c;
 	int err;
 
-	if (unlikely(mlx5e_xsk_get_pool(&priv->channels.params, &priv->xsk, ix)))
+	if (unlikely(mlx5e_xsk_get_pool(params, ix)))
 		return -EBUSY;
 
 	if (unlikely(!mlx5e_xsk_is_pool_sane(pool)))
@@ -159,10 +159,10 @@ validate_closed:
 
 static int mlx5e_xsk_disable_locked(struct mlx5e_priv *priv, u16 ix)
 {
-	struct xsk_buff_pool *pool = mlx5e_xsk_get_pool(&priv->channels.params,
-						   &priv->xsk, ix);
+	struct xsk_buff_pool *pool;
 	struct mlx5e_channel *c;
 
+	pool = mlx5e_xsk_get_pool(&priv->channels.params, ix);
 	if (unlikely(!pool))
 		return -EINVAL;
 
