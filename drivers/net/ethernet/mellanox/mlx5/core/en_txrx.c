@@ -110,6 +110,23 @@ static bool mlx5e_napi_xsk_post(struct mlx5e_xdpsq *xsksq, struct mlx5e_rq *xskr
 	return busy_xsk;
 }
 
+static bool
+mlx5e_napi_zctap_post(struct mlx5e_rq *xskrq)
+{
+	int err;
+
+	err = INDIRECT_CALL_2(xskrq->post_wqes,
+			      mlx5e_post_rx_wqes,
+			      mlx5e_post_rx_mpwqes,
+			      xskrq);
+#if 0
+	if (unlikely(err))
+		set_bit(ZCT_ifq_empty, &rq->zctap_ifq->flags)
+#endif
+
+	return false;
+}
+
 int mlx5e_napi_poll(struct napi_struct *napi, int budget)
 {
 	struct mlx5e_channel *c = container_of(napi, struct mlx5e_channel,
@@ -183,12 +200,8 @@ int mlx5e_napi_poll(struct napi_struct *napi, int budget)
 				mlx5e_post_rx_wqes,
 				rq);
 
-	if (zctap_open) {
-		busy_xsk |= INDIRECT_CALL_2(xskrq->post_wqes,
-					    mlx5e_post_rx_mpwqes,
-					    mlx5e_post_rx_wqes,
-					    xskrq);
-	}
+	if (zctap_open)
+		busy_xsk |= mlx5e_napi_zctap_post(xskrq);
 
 	if (xsk_open) {
 		busy |= mlx5e_poll_xdpsq_cq(&xsksq->cq);
