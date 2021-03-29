@@ -439,11 +439,25 @@ struct tcp_out_options {
 	u8 num_sack_blocks;	/* number of SACK blocks to include */
 	u8 hash_size;		/* bytes in hash_location */
 	u8 bpf_opt_len;		/* length of BPF hdr option */
+	u8 pad_size;		/* additional nops for padding */
 	__u8 *hash_location;	/* temporary pointer, overloaded */
 	__u32 tsval, tsecr;	/* need to include OPTION_TS */
 	struct tcp_fastopen_cookie *fastopen_cookie;	/* Fast open cookie */
 	struct mptcp_out_options mptcp;
 };
+
+static void zctap_padding_write(__be32 *ptr, struct tcp_out_options *opts)
+{
+#if IS_ENABLED(CONFIG_ZCTAP)
+	if (unlikely(opts->pad_size)) {
+		int len = opts->pad_size;
+		u8 *p = (u8 *)ptr;
+
+		while (len--)
+			*p++ = TCPOPT_NOP;
+	}
+#endif
+}
 
 static void mptcp_options_write(__be32 *ptr, const struct tcp_sock *tp,
 				struct tcp_out_options *opts)
@@ -703,6 +717,8 @@ static void tcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 	smc_options_write(ptr, &options);
 
 	mptcp_options_write(ptr, tp, opts);
+
+	zctap_padding_write(ptr, opts);
 }
 
 static void smc_set_option(const struct tcp_sock *tp,
@@ -981,6 +997,16 @@ static unsigned int tcp_established_options(struct sock *sk, struct sk_buff *skb
 
 		size = MAX_TCP_OPTION_SPACE - remaining;
 	}
+
+#if IS_ENABLED(CONFIG_ZCTAP)
+	if (unlikely(tp->hdr_minsize)) {
+		/* force padding */
+		if (size < tp->hdr_minsize) {
+			opts->pad_size = tp->hdr_minsize - size;
+			size += opts->pad_size;
+		}
+	}
+#endif
 
 	return size;
 }

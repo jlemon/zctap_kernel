@@ -3554,6 +3554,12 @@ static int do_tcp_setsockopt(struct sock *sk, int level, int optname,
 		else
 			icsk->icsk_syn_retries = val;
 		break;
+	case TCP_HDR_MINSIZE:
+		if (val < 0 || val > 60 || (val % 4))
+			err = -EINVAL;
+		else
+			tp->hdr_minsize = val;
+		break;
 
 	case TCP_SAVE_SYN:
 		/* 0: disable, 1: enable, 2: start from ether_header */

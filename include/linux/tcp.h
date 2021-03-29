@@ -362,6 +362,7 @@ struct tcp_sock {
 #else
 #define BPF_SOCK_OPS_TEST_FLAG(TP, ARG) 0
 #endif
+	u8	hdr_minsize;		/* XXX hack for header splitting */
 
 	u16 timeout_rehash;	/* Timeout-triggered rehash attempts */
 
