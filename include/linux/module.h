@@ -396,7 +396,6 @@ struct module {
 	unsigned int num_gpl_syms;
 	const struct kernel_symbol *gpl_syms;
 	const s32 *gpl_crcs;
-	bool using_gplonly_symbols;
 
 #ifdef CONFIG_MODULE_SIG
 	/* Signature was verified. */
