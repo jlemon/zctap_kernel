@@ -486,7 +486,7 @@ static int mlx5e_alloc_rq(struct mlx5e_params *params,
 		rq->mkey_be = cpu_to_be32(mdev->mlx5e_res.hw_objs.mkey.key);
 	}
 
-	if (xsk) {
+	if (rq->xsk_pool) {
 		err = xdp_rxq_info_reg_mem_model(&rq->xdp_rxq,
 						 MEM_TYPE_XSK_BUFF_POOL, NULL);
 		xsk_pool_set_rxq_info(rq->xsk_pool, &rq->xdp_rxq);
