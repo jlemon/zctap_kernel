@@ -4505,6 +4505,35 @@ static int mlx5e_xdp(struct net_device *dev, struct netdev_bpf *xdp)
 	}
 }
 
+#if 0
+/*
+ * XXX
+ * should change api so caller passes in type selection bit for qid.
+ */
+static int mlx5e_wakeup(struct net_device *dev, u32 qid, u32 flags)
+{
+	struct mlx5e_priv *priv = netdev_priv(dev);
+	struct mlx5e_params *params = &priv->channels.params;
+	struct mlx5e_channel *c;
+	u16 ix;
+
+	if (unlikely(!mlx5e_qid_get_ch_if_in_group(params, qid,
+						   MLX5E_RQ_GROUP_EXTENSION,
+						   &ix)))
+		return -EINVAL;
+
+	c = priv->channels.c[ix];
+
+	if (test_bit(MLX5E_CHANNEL_STATE_XSK, c->state))
+		return mlx5e_xsk_wakeup(dev, qid, flags);
+
+	if (test_bit(MLX5E_CHANNEL_STATE_ZCTAP, c->state))
+		return mlx5e_zctap_wakeup(dev, qid, flags);
+
+	return -ENXIO;
+}
+#endif
+
 #ifdef CONFIG_MLX5_ESWITCH
 static int mlx5e_bridge_getlink(struct sk_buff *skb, u32 pid, u32 seq,
 				struct net_device *dev, u32 filter_mask,
