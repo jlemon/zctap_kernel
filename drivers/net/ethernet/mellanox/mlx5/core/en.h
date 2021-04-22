@@ -623,6 +623,7 @@ struct mlx5e_rq {
 		u16            headroom;
 		u32            frame0_sz;
 		u8             map_dir;   /* dma map direction */
+		u8             frame0_split;
 	} buff;
 
 	struct device         *pdev;
@@ -654,6 +655,7 @@ struct mlx5e_rq {
 
 	/* AF_XDP zero-copy */
 	struct xsk_buff_pool  *xsk_pool;
+	struct zctap_ifq      *zctap_ifq;
 
 	struct work_struct     recover_work;
 
@@ -673,6 +675,7 @@ struct mlx5e_rq {
 
 enum mlx5e_channel_state {
 	MLX5E_CHANNEL_STATE_XSK,
+	MLX5E_CHANNEL_STATE_ZCTAP,
 	MLX5E_CHANNEL_NUM_STATES
 };
 
