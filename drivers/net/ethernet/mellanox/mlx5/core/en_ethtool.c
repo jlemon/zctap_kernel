@@ -396,7 +396,7 @@ void mlx5e_ethtool_get_channels(struct mlx5e_priv *priv,
 
 	ch->max_combined   = priv->max_nch;
 	ch->combined_count = priv->channels.params.num_channels;
-	if (priv->xsk.refcnt) {
+	if (priv->xsk.refcnt || priv->zctap.refcnt) {
 		/* The upper half are XSK queues. */
 		ch->max_combined *= 2;
 		ch->combined_count *= 2;
@@ -434,12 +434,13 @@ int mlx5e_ethtool_set_channels(struct mlx5e_priv *priv,
 
 	mutex_lock(&priv->state_lock);
 
-	/* Don't allow changing the number of channels if there is an active
-	 * XSK, because the numeration of the XSK and regular RQs will change.
+	/* Don't allow changing the number of channels if there are active
+	 * extensions, because the enumeration of the extensions and regular
+	 * RQs will change.
 	 */
-	if (priv->xsk.refcnt) {
+	if (priv->xsk.refcnt || priv->zctap.refcnt) {
 		err = -EINVAL;
-		netdev_err(priv->netdev, "%s: AF_XDP is active, cannot change the number of channels\n",
+		netdev_err(priv->netdev, "%s: Extensions are active, cannot change the number of channels\n",
 			   __func__);
 		goto out;
 	}

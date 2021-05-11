@@ -7,8 +7,26 @@
 #include "en.h"
 
 struct mlx5e_xsk_param {
-	u16 headroom;
-	u16 chunk_size;
+	u16                        headroom;
+	u16                        chunk_size;
+	struct xsk_buff_pool      *pool;
+};
+
+struct mlx5e_zctap_param {
+	u8			   split_offset;
+};
+
+enum mlx5e_extension_type {
+	MLX5E_EXT_XSK,
+	MLX5E_EXT_ZCTAP,
+};
+
+struct mlx5e_extension_param {
+	enum mlx5e_extension_type   type;
+	union {
+		struct mlx5e_xsk_param xsk;
+		struct mlx5e_zctap_param zctap;
+	};
 };
 
 struct mlx5e_cq_param {
@@ -50,6 +68,27 @@ struct mlx5e_create_sq_param {
 	u8                          tis_lst_sz;
 	u8                          min_inline_mode;
 };
+
+static inline bool mlx5e_extension_is(struct mlx5e_extension_param *ext,
+				      enum mlx5e_extension_type type)
+{
+	return ext && ext->type == type;
+}
+
+static inline bool mlx5e_extension_avail(struct mlx5e_params *params, u16 ix)
+{
+	struct mlx5e_zctap *zctap = params->zctap;
+	struct mlx5e_xsk *xsk = params->xsk;
+
+	if (unlikely(ix >= params->num_channels))
+                return false;
+
+	if (!xsk || !zctap)
+		return false;
+
+	return !((xsk->pools && xsk->pools[ix]) ||
+		 (zctap->ifq_tbl && zctap->ifq_tbl[ix]));
+}
 
 static inline bool mlx5e_qid_get_ch_if_in_group(struct mlx5e_params *params,
 						u16 qid,
@@ -99,34 +138,34 @@ void mlx5e_init_rq_type_params(struct mlx5_core_dev *mdev, struct mlx5e_params *
 bool mlx5e_verify_rx_mpwqe_strides(struct mlx5_core_dev *mdev,
 				   u8 log_stride_sz, u8 log_num_strides);
 u16 mlx5e_get_linear_rq_headroom(struct mlx5e_params *params,
-				 struct mlx5e_xsk_param *xsk);
+				 struct mlx5e_extension_param *ext);
 u32 mlx5e_rx_get_min_frag_sz(struct mlx5e_params *params,
-			     struct mlx5e_xsk_param *xsk);
+			     struct mlx5e_extension_param *ext);
 u8 mlx5e_mpwqe_log_pkts_per_wqe(struct mlx5e_params *params,
-				struct mlx5e_xsk_param *xsk);
+				struct mlx5e_extension_param *ext);
 bool mlx5e_rx_is_linear_skb(struct mlx5e_params *params,
-			    struct mlx5e_xsk_param *xsk);
+			    struct mlx5e_extension_param *ext);
 bool mlx5e_rx_mpwqe_is_linear_skb(struct mlx5_core_dev *mdev,
 				  struct mlx5e_params *params,
-				  struct mlx5e_xsk_param *xsk);
+				  struct mlx5e_extension_param *ext);
 u8 mlx5e_mpwqe_get_log_rq_size(struct mlx5e_params *params,
-			       struct mlx5e_xsk_param *xsk);
+			       struct mlx5e_extension_param *ext);
 u8 mlx5e_mpwqe_get_log_stride_size(struct mlx5_core_dev *mdev,
 				   struct mlx5e_params *params,
-				   struct mlx5e_xsk_param *xsk);
+				   struct mlx5e_extension_param *ext);
 u8 mlx5e_mpwqe_get_log_num_strides(struct mlx5_core_dev *mdev,
 				   struct mlx5e_params *params,
-				   struct mlx5e_xsk_param *xsk);
+				   struct mlx5e_extension_param *ext);
 u16 mlx5e_get_rq_headroom(struct mlx5_core_dev *mdev,
 			  struct mlx5e_params *params,
-			  struct mlx5e_xsk_param *xsk);
+			  struct mlx5e_extension_param *ext);
 
 /* Build queue parameters */
 
 void mlx5e_build_create_cq_param(struct mlx5e_create_cq_param *ccp, struct mlx5e_channel *c);
 int mlx5e_build_rq_param(struct mlx5_core_dev *mdev,
 			 struct mlx5e_params *params,
-			 struct mlx5e_xsk_param *xsk,
+			 struct mlx5e_extension_param *ext,
 			 u16 q_counter,
 			 struct mlx5e_rq_param *param);
 void mlx5e_build_drop_rq_param(struct mlx5_core_dev *mdev,

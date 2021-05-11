@@ -1768,7 +1768,8 @@ wq_free_wqe:
 
 #endif /* CONFIG_MLX5_EN_IPSEC */
 
-int mlx5e_rq_set_handlers(struct mlx5e_rq *rq, struct mlx5e_params *params, bool xsk)
+int mlx5e_rq_set_handlers(struct mlx5e_rq *rq, struct mlx5e_params *params,
+			  struct mlx5e_extension_param *ext)
 {
 	struct net_device *netdev = rq->netdev;
 	struct mlx5_core_dev *mdev = rq->mdev;
@@ -1776,7 +1777,7 @@ int mlx5e_rq_set_handlers(struct mlx5e_rq *rq, struct mlx5e_params *params, bool
 
 	switch (rq->wq_type) {
 	case MLX5_WQ_TYPE_LINKED_LIST_STRIDING_RQ:
-		rq->mpwqe.skb_from_cqe_mpwrq = xsk ?
+		rq->mpwqe.skb_from_cqe_mpwrq = mlx5e_extension_is(ext, MLX5E_EXT_XSK)?
 			mlx5e_xsk_skb_from_cqe_mpwrq_linear :
 			mlx5e_rx_mpwqe_is_linear_skb(mdev, params, NULL) ?
 				mlx5e_skb_from_cqe_mpwrq_linear :
@@ -1795,8 +1796,10 @@ int mlx5e_rq_set_handlers(struct mlx5e_rq *rq, struct mlx5e_params *params, bool
 		}
 		break;
 	default: /* MLX5_WQ_TYPE_CYCLIC */
-		rq->wqe.skb_from_cqe = xsk ?
-			mlx5e_xsk_skb_from_cqe_linear :
+		rq->wqe.skb_from_cqe = mlx5e_extension_is(ext, MLX5E_EXT_XSK) ?
+				mlx5e_xsk_skb_from_cqe_linear :
+			mlx5e_extension_is(ext, MLX5E_EXT_ZCTAP) ?
+				mlx5e_skb_from_cqe_nonlinear :
 			mlx5e_rx_is_linear_skb(params, NULL) ?
 				mlx5e_skb_from_cqe_linear :
 				mlx5e_skb_from_cqe_nonlinear;

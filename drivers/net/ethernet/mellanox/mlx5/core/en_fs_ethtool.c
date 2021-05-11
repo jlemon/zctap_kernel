@@ -425,7 +425,8 @@ add_ethtool_flow_rule(struct mlx5e_priv *priv,
 		u16 ix;
 
 		mlx5e_qid_get_ch_and_group(params, fs->ring_cookie, &ix, &group);
-		tir = group == MLX5E_RQ_GROUP_XSK ? priv->xsk_tir : priv->direct_tir;
+		tir = group == MLX5E_RQ_GROUP_REGULAR ? priv->direct_tir
+						      : priv->extension_tir;
 
 		dst = kzalloc(sizeof(*dst), GFP_KERNEL);
 		if (!dst) {

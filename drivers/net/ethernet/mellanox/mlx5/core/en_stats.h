@@ -49,6 +49,7 @@
 #define MLX5E_DECLARE_RQ_XDPSQ_STAT(type, fld) "rx%d_xdp_tx_"#fld, offsetof(type, fld)
 #define MLX5E_DECLARE_XSKRQ_STAT(type, fld) "rx%d_xsk_"#fld, offsetof(type, fld)
 #define MLX5E_DECLARE_XSKSQ_STAT(type, fld) "tx%d_xsk_"#fld, offsetof(type, fld)
+#define MLX5E_DECLARE_ZCTRQ_STAT(type, fld) "rx%d_zct_"#fld, offsetof(type, fld)
 #define MLX5E_DECLARE_CH_STAT(type, fld) "ch%d_"#fld, offsetof(type, fld)
 
 #define MLX5E_DECLARE_PTP_TX_STAT(type, fld) "ptp_tx%d_"#fld, offsetof(type, fld)
@@ -249,6 +250,26 @@ struct mlx5e_sw_stats {
 	u64 tx_xsk_full;
 	u64 tx_xsk_err;
 	u64 tx_xsk_cqes;
+
+	u64 rx_zct_packets;
+	u64 rx_zct_bytes;
+	u64 rx_zct_csum_complete;
+	u64 rx_zct_csum_unnecessary;
+	u64 rx_zct_csum_unnecessary_inner;
+	u64 rx_zct_csum_none;
+	u64 rx_zct_ecn_mark;
+	u64 rx_zct_removed_vlan_packets;
+	u64 rx_zct_xdp_drop;
+	u64 rx_zct_xdp_redirect;
+	u64 rx_zct_wqe_err;
+	u64 rx_zct_mpwqe_filler_cqes;
+	u64 rx_zct_mpwqe_filler_strides;
+	u64 rx_zct_oversize_pkts_sw_drop;
+	u64 rx_zct_buff_alloc_err;
+	u64 rx_zct_cqe_compress_blks;
+	u64 rx_zct_cqe_compress_pkts;
+	u64 rx_zct_congst_umr;
+	u64 rx_zct_arfs_err;
 };
 
 struct mlx5e_qcounter_stats {

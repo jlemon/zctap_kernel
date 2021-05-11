@@ -169,7 +169,7 @@ do {                                                            \
 
 enum mlx5e_rq_group {
 	MLX5E_RQ_GROUP_REGULAR,
-	MLX5E_RQ_GROUP_XSK,
+	MLX5E_RQ_GROUP_EXTENSION,
 #define MLX5E_NUM_RQ_GROUPS(g) (1 + MLX5E_RQ_GROUP_##g)
 };
 
@@ -267,6 +267,7 @@ struct mlx5e_params {
 	u32 pflags;
 	struct bpf_prog *xdp_prog;
 	struct mlx5e_xsk *xsk;
+	struct mlx5e_zctap *zctap;
 	unsigned int sw_mtu;
 	int hard_mtu;
 	bool ptp_rx;
@@ -310,7 +311,8 @@ struct mlx5e_cq_decomp {
 
 enum mlx5e_dma_map_type {
 	MLX5E_DMA_MAP_SINGLE,
-	MLX5E_DMA_MAP_PAGE
+	MLX5E_DMA_MAP_PAGE,
+	MLX5E_DMA_MAP_FIXED,
 };
 
 struct mlx5e_sq_dma {
@@ -571,7 +573,9 @@ typedef struct sk_buff *
 typedef bool (*mlx5e_fp_post_rx_wqes)(struct mlx5e_rq *rq);
 typedef void (*mlx5e_fp_dealloc_wqe)(struct mlx5e_rq*, u16);
 
-int mlx5e_rq_set_handlers(struct mlx5e_rq *rq, struct mlx5e_params *params, bool xsk);
+struct mlx5e_extension_param;
+int mlx5e_rq_set_handlers(struct mlx5e_rq *rq, struct mlx5e_params *params,
+			  struct mlx5e_extension_param *ext);
 void mlx5e_rq_set_trap_handlers(struct mlx5e_rq *rq, struct mlx5e_params *params);
 
 enum mlx5e_rq_flag {
@@ -582,6 +586,7 @@ enum mlx5e_rq_flag {
 struct mlx5e_rq_frag_info {
 	int frag_size;
 	int frag_stride;
+	int frag_source;
 };
 
 struct mlx5e_rq_frags_info {
@@ -726,6 +731,7 @@ struct mlx5e_channel_stats {
 	struct mlx5e_sq_stats sq[MLX5E_MAX_NUM_TC];
 	struct mlx5e_rq_stats rq;
 	struct mlx5e_rq_stats xskrq;
+	struct mlx5e_rq_stats zctrq;
 	struct mlx5e_xdpsq_stats rq_xdpsq;
 	struct mlx5e_xdpsq_stats xdpsq;
 	struct mlx5e_xdpsq_stats xsksq;
@@ -798,6 +804,12 @@ struct mlx5e_xsk {
 	bool ever_used;
 };
 
+struct mlx5e_zctap {
+	struct zctap_ifq **ifq_tbl;
+	u16 refcnt;
+	bool ever_used;
+};
+
 /* Temporary storage for variables that are allocated when struct mlx5e_priv is
  * initialized, and used where we can't allocate them because that functions
  * must not fail. Use with care and make sure the same variable is not used
@@ -841,7 +853,7 @@ struct mlx5e_priv {
 	struct mlx5e_tir           indir_tir[MLX5E_NUM_INDIR_TIRS];
 	struct mlx5e_tir           inner_indir_tir[MLX5E_NUM_INDIR_TIRS];
 	struct mlx5e_tir           direct_tir[MLX5E_MAX_NUM_CHANNELS];
-	struct mlx5e_tir           xsk_tir[MLX5E_MAX_NUM_CHANNELS];
+	struct mlx5e_tir           extension_tir[MLX5E_MAX_NUM_CHANNELS];
 	struct mlx5e_tir           ptp_tir;
 	struct mlx5e_rss_params    rss_params;
 	u32                        tx_rates[MLX5E_MAX_NUM_SQS];
@@ -890,6 +902,7 @@ struct mlx5e_priv {
 	struct devlink_health_reporter *tx_reporter;
 	struct devlink_health_reporter *rx_reporter;
 	struct mlx5e_xsk           xsk;
+	struct mlx5e_zctap         zctap;
 #if IS_ENABLED(CONFIG_PCI_HYPERV_INTERFACE)
 	struct mlx5e_hv_vhca_stats_agent stats_agent;
 #endif
@@ -967,11 +980,11 @@ void mlx5e_build_indir_tir_ctx_hash(struct mlx5e_rss_params *rss_params,
 void mlx5e_modify_tirs_hash(struct mlx5e_priv *priv, void *in);
 struct mlx5e_tirc_config mlx5e_tirc_get_default_config(enum mlx5e_traffic_types tt);
 
-struct mlx5e_xsk_param;
+struct mlx5e_extension_param;
 
 struct mlx5e_rq_param;
 int mlx5e_open_rq(struct mlx5e_params *params, struct mlx5e_rq_param *param,
-		  struct mlx5e_xsk_param *xsk, int node,
+		  struct mlx5e_extension_param *ext, int node,
 		  struct mlx5e_rq *rq);
 int mlx5e_wait_for_min_rx_wqes(struct mlx5e_rq *rq, int wait_time);
 void mlx5e_deactivate_rq(struct mlx5e_rq *rq);
@@ -1176,7 +1189,7 @@ int mlx5e_netdev_change_profile(struct mlx5e_priv *priv,
 				const struct mlx5e_profile *new_profile, void *new_ppriv);
 void mlx5e_netdev_attach_nic_profile(struct mlx5e_priv *priv);
 void mlx5e_set_netdev_mtu_boundaries(struct mlx5e_priv *priv);
-void mlx5e_build_nic_params(struct mlx5e_priv *priv, struct mlx5e_xsk *xsk, u16 mtu);
+void mlx5e_build_nic_params(struct mlx5e_priv *priv, u16 mtu);
 void mlx5e_build_rss_params(struct mlx5e_rss_params *rss_params,
 			    u16 num_channels);
 void mlx5e_rx_dim_work(struct work_struct *work);
