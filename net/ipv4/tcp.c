@@ -492,6 +492,13 @@ static bool tcp_stream_is_readable(struct sock *sk, int target)
 	return false;
 }
 
+static inline bool tcp_stream_rdband(const struct sock *sk)
+{
+	if (sk->sk_prot->stream_memory_rdband)
+		return sk->sk_prot->stream_memory_rdband(sk);
+	return false;
+}
+
 /*
  *	Wait for a TCP event.
  *
@@ -563,6 +570,8 @@ __poll_t tcp_poll(struct file *file, struct socket *sock, poll_table *wait)
 
 		if (tcp_stream_is_readable(sk, target))
 			mask |= EPOLLIN | EPOLLRDNORM;
+		if (tcp_stream_rdband(sk))
+			mask |= EPOLLRDBAND;
 
 		if (!(sk->sk_shutdown & SEND_SHUTDOWN)) {
 			if (__sk_stream_is_writeable(sk, 1)) {
